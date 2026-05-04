@@ -105,7 +105,10 @@ if user_input := st.chat_input("Type your message here..."):
             data = {"contents": st.session_state.gemini_history}
             response = requests.post(URL, json=data)
             result = response.json()
-            reply = result["candidates"][0]["content"]["parts"][0]["text"]
+            if "candidates" in result:
+    reply = result["candidates"][0]["content"]["parts"][0]["text"]
+else:
+    reply = "Sorry, I could not get a response. Please try again!"
 
         st.markdown(reply)
 
