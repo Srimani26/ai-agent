@@ -101,7 +101,7 @@ if user_input := st.chat_input("Type your message here..."):
                 if "candidates" in result:
                     reply = result["candidates"][0]["content"]["parts"][0]["text"]
                 else:
-                    reply = "Sorry, I could not get a response. Please try again!"
+                    reply = f"Debug info: {str(result)}"
             except Exception as e:
                 reply = "Something went wrong. Please try again!"
 
