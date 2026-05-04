@@ -624,7 +624,7 @@ if user_input := st.chat_input("Ask ARIA anything — AI, automation, code, webs
                 if "candidates" in result:
                     reply = result["candidates"][0]["content"]["parts"][0]["text"]
                 else:
-                    reply = f"⚠️ {result.get('error', {}).get('message', 'Please try again.')}""
+                    reply = f"⚠️ {result.get('error', {}).get('message', 'Please try again.')}"
 
             except requests.exceptions.Timeout:
                 reply = "⏱️ Timeout — please try again!"
