@@ -1,7 +1,7 @@
 import requests
 import streamlit as st
 
-API_KEY = "AIzaSyAwfp8FJLDHvUZYoy8fKgB0as7dMxs8g_M"
+API_KEY = st.secrets["AIzaSyAwfp8FJLDHvUZYoy8fKgB0as7dMxs8g_M"]
 
 URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={API_KEY}"
 
