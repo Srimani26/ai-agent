@@ -27,11 +27,9 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-
     .stApp {
         background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     }
-
     .chat-title {
         text-align: center;
         padding: 20px 0 5px 0;
@@ -39,22 +37,16 @@ st.markdown("""
         font-weight: 700;
         color: #1a1a2e;
     }
-
     .chat-subtitle {
         text-align: center;
         color: #555;
         font-size: 0.95rem;
         margin-bottom: 20px;
     }
-
     [data-testid="stChatMessage"] {
         border-radius: 15px;
         padding: 10px;
         margin-bottom: 8px;
-    }
-
-    [data-testid="stChatInput"] {
-        border-radius: 25px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -83,7 +75,7 @@ for msg in st.session_state.messages:
 
 if not st.session_state.messages:
     with st.chat_message("assistant"):
-        st.markdown("👋 Hello! I am your AI Assistant. I can answer questions, write content, analyze data, and much more. How can I help you today?")
+        st.markdown("👋 Hello! I am your AI Assistant. How can I help you today?")
 
 if user_input := st.chat_input("Type your message here..."):
 
@@ -102,13 +94,16 @@ if user_input := st.chat_input("Type your message here..."):
 
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            data = {"contents": st.session_state.gemini_history}
-            response = requests.post(URL, json=data)
-            result = response.json()
-            if "candidates" in result:
-    reply = result["candidates"][0]["content"]["parts"][0]["text"]
-else:
-    reply = "Sorry, I could not get a response. Please try again!"
+            try:
+                data = {"contents": st.session_state.gemini_history}
+                response = requests.post(URL, json=data)
+                result = response.json()
+                if "candidates" in result:
+                    reply = result["candidates"][0]["content"]["parts"][0]["text"]
+                else:
+                    reply = "Sorry, I could not get a response. Please try again!"
+            except Exception as e:
+                reply = "Something went wrong. Please try again!"
 
         st.markdown(reply)
 
