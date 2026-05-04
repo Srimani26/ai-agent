@@ -55,260 +55,395 @@ RESPONSE RULES:
 st.set_page_config(
     page_title="ARIA — AI Assistant",
     page_icon="⚡",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
+# ── FIXED CSS — Addresses all spacing, alignment, and selector issues ──
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
-* { font-family: 'Inter', sans-serif; box-sizing: border-box; margin: 0; padding: 0; }
+/* ── GLOBAL RESETS (Conservative) ── */
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
+}
 
-#MainMenu, footer, header { visibility: hidden; }
+/* Hide Streamlit chrome */
+#MainMenu {visibility: hidden;}
+header {visibility: hidden;}
+footer {visibility: hidden;}
 
+/* ── APP BACKGROUND ── */
 .stApp {
-    background: #0a0a0f;
-    min-height: 100vh;
+    background: linear-gradient(135deg, #0a0a0f 0%, #0d0d1a 100%);
 }
 
-/* ── SIDEBAR ── */
-[data-testid="stSidebar"] {
-    background: #0d0d1a !important;
-    border-right: 1px solid #1e1e3a !important;
-    padding: 0 !important;
+/* ── SIDEBAR FIXES ── */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #0d0d1a 0%, #111122 100%) !important;
+    border-right: 1px solid rgba(124, 58, 237, 0.15) !important;
 }
-[data-testid="stSidebar"] > div {
-    padding: 20px 12px !important;
+
+section[data-testid="stSidebar"] > div:first-child {
+    padding: 1.5rem 1rem !important;
 }
-[data-testid="stSidebar"] p,
-[data-testid="stSidebar"] span,
-[data-testid="stSidebar"] div,
-[data-testid="stSidebar"] label,
-[data-testid="stSidebar"] h1,
-[data-testid="stSidebar"] h2,
-[data-testid="stSidebar"] h3,
-[data-testid="stSidebar"] li {
+
+section[data-testid="stSidebar"] .stMarkdown {
     color: #e2e8f0 !important;
 }
 
+/* Brand */
 .brand {
     text-align: center;
-    padding: 10px 0 20px 0;
+    padding: 0.5rem 0 1.5rem 0;
+    margin-bottom: 0.5rem;
 }
 .brand-name {
-    font-size: 1.6rem;
+    font-size: 1.8rem;
     font-weight: 800;
     background: linear-gradient(135deg, #7c3aed, #2563eb, #059669);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    letter-spacing: 2px;
+    letter-spacing: 3px;
 }
 .brand-sub {
-    font-size: 0.7rem;
-    color: #4a5568;
-    letter-spacing: 1px;
-    margin-top: 2px;
+    font-size: 0.65rem;
+    color: #64748b;
+    letter-spacing: 2px;
+    margin-top: 4px;
+    text-transform: uppercase;
 }
 
+/* Stats Grid */
 .stat-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin: 12px 0;
+    gap: 10px;
+    margin: 1rem 0;
 }
 .stat-card {
-    background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(37,99,235,0.1));
-    border: 1px solid rgba(124,58,237,0.3);
-    border-radius: 10px;
-    padding: 10px 8px;
+    background: linear-gradient(135deg, rgba(124,58,237,0.12), rgba(37,99,235,0.08));
+    border: 1px solid rgba(124,58,237,0.2);
+    border-radius: 12px;
+    padding: 12px 8px;
     text-align: center;
+    transition: all 0.2s ease;
+}
+.stat-card:hover {
+    border-color: rgba(124,58,237,0.4);
+    transform: translateY(-1px);
 }
 .stat-num {
-    font-size: 1.6rem;
+    font-size: 1.5rem;
     font-weight: 700;
-    color: #7c3aed !important;
+    color: #a78bfa !important;
+    line-height: 1;
 }
 .stat-lbl {
-    font-size: 0.68rem;
+    font-size: 0.65rem;
     color: #64748b !important;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
+    margin-top: 6px;
 }
 
+/* Section Titles */
 .section-title {
     font-size: 0.7rem;
-    font-weight: 600;
-    color: #4a5568 !important;
+    font-weight: 700;
+    color: #475569 !important;
     text-transform: uppercase;
     letter-spacing: 1.5px;
-    margin: 16px 0 8px 0;
+    margin: 1.5rem 0 0.75rem 0;
 }
 
-/* Sidebar mode buttons */
-.stButton > button {
-    background: rgba(255,255,255,0.04) !important;
-    border: 1px solid rgba(255,255,255,0.08) !important;
+/* Sidebar Buttons */
+section[data-testid="stSidebar"] .stButton > button {
+    background: rgba(255,255,255,0.03) !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
     color: #cbd5e1 !important;
-    border-radius: 8px !important;
-    font-size: 0.82rem !important;
+    border-radius: 10px !important;
+    font-size: 0.85rem !important;
     font-weight: 500 !important;
-    padding: 9px 12px !important;
-    transition: all 0.2s ease !important;
+    padding: 10px 14px !important;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
     width: 100% !important;
     text-align: left !important;
-    margin-bottom: 4px !important;
+    margin-bottom: 6px !important;
 }
-.stButton > button:hover {
-    background: rgba(124,58,237,0.2) !important;
-    border-color: rgba(124,58,237,0.5) !important;
+section[data-testid="stSidebar"] .stButton > button:hover {
+    background: rgba(124,58,237,0.15) !important;
+    border-color: rgba(124,58,237,0.4) !important;
     color: #a78bfa !important;
-    transform: translateX(3px) !important;
+    transform: translateX(4px);
+}
+section[data-testid="stSidebar"] .stButton > button:active {
+    transform: translateX(2px) scale(0.98);
 }
 
+/* History Items */
 .history-item {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 7px;
-    padding: 7px 10px;
-    margin-bottom: 5px;
-    font-size: 0.78rem;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 6px;
+    font-size: 0.8rem;
     color: #94a3b8;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    transition: all 0.2s ease;
 }
 .history-item:hover {
-    background: rgba(124,58,237,0.1);
-    border-color: rgba(124,58,237,0.3);
+    background: rgba(124,58,237,0.08);
+    border-color: rgba(124,58,237,0.2);
+    color: #cbd5e1;
 }
 
-/* ── MAIN AREA ── */
+/* ── MAIN CONTENT AREA ── */
+.main-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+}
+
 .main-header {
     text-align: center;
-    padding: 30px 0 16px 0;
+    padding: 2rem 0 1rem 0;
 }
 .main-title {
-    font-size: 3rem;
+    font-size: 3.5rem;
     font-weight: 800;
     background: linear-gradient(135deg, #7c3aed 0%, #2563eb 50%, #059669 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    letter-spacing: -1px;
-    line-height: 1.1;
+    letter-spacing: -2px;
+    line-height: 1;
+    margin-bottom: 0.5rem;
 }
 .main-tagline {
-    font-size: 0.95rem;
+    font-size: 1rem;
     color: #475569;
-    margin-top: 6px;
     letter-spacing: 0.5px;
+    font-weight: 400;
 }
 
+/* Badges */
 .badge-row {
     display: flex;
     justify-content: center;
-    gap: 8px;
-    margin: 14px 0 20px 0;
+    gap: 10px;
+    margin: 1.5rem 0 2rem 0;
     flex-wrap: wrap;
 }
 .badge {
-    background: rgba(124,58,237,0.1);
-    border: 1px solid rgba(124,58,237,0.25);
+    background: rgba(124,58,237,0.08);
+    border: 1px solid rgba(124,58,237,0.2);
     border-radius: 20px;
-    padding: 4px 12px;
-    font-size: 0.75rem;
+    padding: 6px 14px;
+    font-size: 0.8rem;
     color: #a78bfa;
     font-weight: 500;
     letter-spacing: 0.3px;
+    transition: all 0.2s ease;
+}
+.badge:hover {
+    background: rgba(124,58,237,0.15);
+    border-color: rgba(124,58,237,0.35);
+    transform: translateY(-1px);
 }
 
-/* ── CHAT MESSAGES ── */
-[data-testid="stChatMessage"] {
+/* ── CHAT MESSAGES — FIXED SELECTORS ── */
+/* Target the message containers properly */
+.stChatMessage {
     background: #111122 !important;
     border: 1px solid #1e1e3a !important;
-    border-radius: 14px !important;
-    padding: 16px 18px !important;
-    margin-bottom: 12px !important;
+    border-radius: 16px !important;
+    padding: 1rem 1.25rem !important;
+    margin-bottom: 1rem !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
 }
-[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
-    background: rgba(37,99,235,0.08) !important;
-    border-color: rgba(37,99,235,0.2) !important;
+
+/* User message variant */
+.stChatMessage[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
+    background: linear-gradient(135deg, rgba(37,99,235,0.08), rgba(124,58,237,0.05)) !important;
+    border-color: rgba(37,99,235,0.25) !important;
 }
-[data-testid="stChatMessage"] p,
-[data-testid="stChatMessage"] li,
-[data-testid="stChatMessage"] span,
-[data-testid="stChatMessage"] div,
-[data-testid="stChatMessage"] strong,
-[data-testid="stChatMessage"] em {
+
+/* Message content typography */
+.stChatMessage p,
+.stChatMessage li {
     color: #e2e8f0 !important;
     line-height: 1.7 !important;
+    margin-bottom: 0.5rem !important;
 }
-[data-testid="stChatMessage"] h1,
-[data-testid="stChatMessage"] h2,
-[data-testid="stChatMessage"] h3 {
+.stChatMessage h1,
+.stChatMessage h2,
+.stChatMessage h3 {
     color: #a78bfa !important;
-    margin: 12px 0 6px 0 !important;
+    margin: 1rem 0 0.5rem 0 !important;
+    font-weight: 600 !important;
 }
-[data-testid="stChatMessage"] code {
+.stChatMessage h1 { font-size: 1.5rem !important; }
+.stChatMessage h2 { font-size: 1.25rem !important; }
+.stChatMessage h3 { font-size: 1.1rem !important; }
+
+/* Inline code */
+.stChatMessage code:not(pre code) {
     font-family: 'JetBrains Mono', monospace !important;
     background: rgba(124,58,237,0.15) !important;
     color: #a78bfa !important;
-    border-radius: 5px !important;
-    padding: 2px 7px !important;
-    font-size: 0.85rem !important;
+    border-radius: 6px !important;
+    padding: 2px 8px !important;
+    font-size: 0.85em !important;
+    border: 1px solid rgba(124,58,237,0.2);
 }
-[data-testid="stChatMessage"] pre {
+
+/* Code blocks */
+.stChatMessage pre {
     background: #060610 !important;
     border: 1px solid #1e1e3a !important;
     border-left: 3px solid #7c3aed !important;
-    border-radius: 10px !important;
-    padding: 16px !important;
+    border-radius: 12px !important;
+    padding: 1.25rem !important;
     overflow-x: auto !important;
-    margin: 10px 0 !important;
+    margin: 1rem 0 !important;
 }
-[data-testid="stChatMessage"] pre code {
+.stChatMessage pre code {
     font-family: 'JetBrains Mono', monospace !important;
     color: #e2e8f0 !important;
     background: transparent !important;
     padding: 0 !important;
-    font-size: 0.88rem !important;
+    font-size: 0.9rem !important;
     line-height: 1.6 !important;
 }
 
-/* ── CHAT INPUT ── */
-[data-testid="stChatInput"] {
+/* Tables in messages */
+.stChatMessage table {
+    border-collapse: collapse;
+    margin: 1rem 0;
+    width: 100%;
+}
+.stChatMessage th {
+    background: rgba(124,58,237,0.1);
+    border: 1px solid #1e1e3a;
+    padding: 8px 12px;
+    text-align: left;
+    color: #a78bfa;
+    font-weight: 600;
+}
+.stChatMessage td {
+    border: 1px solid #1e1e3a;
+    padding: 8px 12px;
+    color: #cbd5e1;
+}
+.stChatMessage tr:nth-child(even) {
+    background: rgba(255,255,255,0.02);
+}
+
+/* ── CHAT INPUT — FIXED ── */
+.stChatInputContainer {
     background: #111122 !important;
     border: 1.5px solid #2d2d5e !important;
-    border-radius: 14px !important;
-    padding: 4px 8px !important;
+    border-radius: 16px !important;
+    padding: 4px 6px !important;
+    margin: 1rem 0 2rem 0 !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+    transition: all 0.2s ease;
 }
-[data-testid="stChatInput"]:focus-within {
+.stChatInputContainer:focus-within {
     border-color: #7c3aed !important;
-    box-shadow: 0 0 0 3px rgba(124,58,237,0.15) !important;
+    box-shadow: 0 0 0 3px rgba(124,58,237,0.15), 0 4px 12px rgba(0,0,0,0.3) !important;
 }
-[data-testid="stChatInput"] textarea {
+.stChatInputContainer textarea {
     color: #f1f5f9 !important;
     background: transparent !important;
     caret-color: #7c3aed !important;
     font-size: 0.95rem !important;
     line-height: 1.5 !important;
+    padding: 12px !important;
 }
-[data-testid="stChatInput"] textarea::placeholder {
-    color: #2d2d5e !important;
+.stChatInputContainer textarea::placeholder {
+    color: #475569 !important;
 }
 
-/* Divider */
-hr { border-color: #1e1e3a !important; margin: 14px 0 !important; }
+/* Send button */
+.stChatInputContainer button {
+    background: linear-gradient(135deg, #7c3aed, #2563eb) !important;
+    border: none !important;
+    border-radius: 12px !important;
+    color: white !important;
+    transition: all 0.2s ease !important;
+}
+.stChatInputContainer button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(124,58,237,0.3);
+}
 
-/* Mode indicator */
-.mode-pill {
-    display: inline-block;
-    background: linear-gradient(135deg, rgba(124,58,237,0.2), rgba(37,99,235,0.2));
-    border: 1px solid rgba(124,58,237,0.4);
+/* ── WELCOME CARD ── */
+.welcome-card {
+    background: linear-gradient(135deg, rgba(124,58,237,0.08), rgba(37,99,235,0.05));
+    border: 1px solid rgba(124,58,237,0.15);
     border-radius: 20px;
-    padding: 3px 12px;
-    font-size: 0.78rem;
+    padding: 2rem;
+    margin: 1rem 0 2rem 0;
+}
+.welcome-card h3 {
+    color: #a78bfa !important;
+    margin-top: 0 !important;
+}
+
+/* ── DIVIDER ── */
+hr {
+    border: none;
+    border-top: 1px solid #1e1e3a !important;
+    margin: 1.5rem 0 !important;
+}
+
+/* ── MODE PILL ── */
+.mode-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(37,99,235,0.1));
+    border: 1px solid rgba(124,58,237,0.3);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 0.8rem;
     color: #a78bfa;
-    font-weight: 500;
+    font-weight: 600;
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #0a0a0f;
+}
+::-webkit-scrollbar-thumb {
+    background: #2d2d5e;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #3d3d6e;
+}
+
+/* ── SPINNER ── */
+.stSpinner > div {
+    border-top-color: #7c3aed !important;
+}
+
+/* ── RESPONSIVE FIXES ── */
+@media (max-width: 768px) {
+    .main-title { font-size: 2.5rem !important; }
+    .badge-row { gap: 6px; }
+    .badge { font-size: 0.7rem; padding: 4px 10px; }
+    .stat-grid { gap: 6px; }
+    .stChatMessage { padding: 0.75rem 1rem !important; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -333,10 +468,11 @@ with st.sidebar:
     st.markdown("""
     <div class="brand">
         <div class="brand-name">ARIA</div>
-        <div class="brand-sub">AI ENGINEERING ASSISTANT</div>
+        <div class="brand-sub">AI Engineering Assistant</div>
     </div>
     """, unsafe_allow_html=True)
 
+    # Stats with proper spacing
     st.markdown(f"""
     <div class="stat-grid">
         <div class="stat-card">
@@ -364,18 +500,19 @@ with st.sidebar:
     for label, mode_key, _ in modes:
         if st.button(label, key=f"btn_{mode_key}", use_container_width=True):
             st.session_state.mode = mode_key
+            st.rerun()
 
     st.markdown("---")
     st.markdown(f'<div class="section-title">Active Mode</div><div class="mode-pill">⚡ {st.session_state.mode}</div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="section-title" style="margin-top:16px">💬 Recent Chats</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title" style="margin-top:1.5rem">💬 Recent Chats</div>', unsafe_allow_html=True)
     if st.session_state.messages:
         user_msgs = [m for m in st.session_state.messages if m["role"] == "user"]
         for msg in user_msgs[-6:]:
-            preview = msg["content"][:38] + "..." if len(msg["content"]) > 38 else msg["content"]
+            preview = msg["content"][:40] + "..." if len(msg["content"]) > 40 else msg["content"]
             st.markdown(f'<div class="history-item">› {preview}</div>', unsafe_allow_html=True)
     else:
-        st.markdown('<p style="font-size:0.78rem;color:#374151">No history yet</p>', unsafe_allow_html=True)
+        st.markdown('<p style="font-size:0.8rem;color:#475569;margin-top:0.5rem">No history yet</p>', unsafe_allow_html=True)
 
     st.markdown("---")
     if st.button("🗑️ New Session", use_container_width=True):
@@ -388,9 +525,12 @@ with st.sidebar:
         st.rerun()
 
     st.markdown("---")
-    st.markdown('<p style="font-size:0.72rem;color:#374151;text-align:center">ARIA • Gemini 2.5 Flash<br>Built for AI Engineers</p>', unsafe_allow_html=True)
+    st.markdown('<p style="font-size:0.7rem;color:#475569;text-align:center;margin-top:1rem">ARIA • Gemini 2.5 Flash<br>Built for AI Engineers</p>', unsafe_allow_html=True)
 
 # ── MAIN CONTENT ──
+# Wrap in container for max-width constraint
+st.markdown('<div class="main-container">', unsafe_allow_html=True)
+
 st.markdown("""
 <div class="main-header">
     <div class="main-title">⚡ ARIA</div>
@@ -417,10 +557,13 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# Welcome
+# Welcome message
 if not st.session_state.messages:
     with st.chat_message("assistant"):
-        st.markdown(f"""### 👋 Welcome back, Engineer!
+        st.markdown(f"""
+        <div class="welcome-card">
+
+### 👋 Welcome back, Engineer!
 
 I am **ARIA** — your dedicated AI & Automation Engineering assistant.
 
@@ -438,7 +581,11 @@ I am **ARIA** — your dedicated AI & Automation Engineering assistant.
 
 **Today is {today}** — I have current knowledge of the latest AI tools and frameworks.
 
-*Switch modes in the sidebar or just type your question below!* ⚡""")
+*Switch modes in the sidebar or just type your question below!* ⚡
+        </div>
+        """, unsafe_allow_html=True)
+
+st.markdown('</div>', unsafe_allow_html=True)
 
 # ── CHAT ──
 if user_input := st.chat_input("Ask ARIA anything — AI, automation, code, websites, data..."):
@@ -477,7 +624,7 @@ if user_input := st.chat_input("Ask ARIA anything — AI, automation, code, webs
                 if "candidates" in result:
                     reply = result["candidates"][0]["content"]["parts"][0]["text"]
                 else:
-                    reply = f"⚠️ {result.get('error', {}).get('message', 'Please try again.')}"
+                    reply = f"⚠️ {result.get('error', {}).get('message', 'Please try again.')}""
 
             except requests.exceptions.Timeout:
                 reply = "⏱️ Timeout — please try again!"
