@@ -78,7 +78,6 @@ def create_new_session():
     """Create a new chat session and save current to history"""
     current_messages = st.session_state.messages.copy()
     if len(current_messages) > 0:
-        # Generate title from first user message
         title = "New Chat"
         for msg in current_messages:
             if msg["role"] == "user":
@@ -95,7 +94,6 @@ def create_new_session():
         st.session_state.chat_history.insert(0, session)
         save_history(st.session_state.chat_history)
 
-    # Reset current session
     st.session_state.messages = []
     st.session_state.gemini_history = [
         {"role": "user", "parts": [{"text": SYSTEM_PROMPT}]},
@@ -108,7 +106,6 @@ def load_session(session_id):
     for session in st.session_state.chat_history:
         if session["id"] == session_id:
             st.session_state.messages = session["messages"].copy()
-            # Rebuild gemini history
             gemini_hist = [
                 {"role": "user", "parts": [{"text": SYSTEM_PROMPT}]},
                 {"role": "model", "parts": [{"text": "ARIA online. Ready to assist."}]}
@@ -139,36 +136,26 @@ if "mode" not in st.session_state:
     st.session_state.mode = "General"
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = load_history()
-if "view" not in st.session_state:
-    st.session_state.view = "chat"  # chat, history
 
-# ── CSS — TIGHT LAYOUT, FUNCTIONAL SIDEBAR ──
+# ── CSS ──
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
-html, body, [class*="css"] {
-    font-family: 'Inter', sans-serif;
-}
-
+html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 #MainMenu, header, footer {visibility: hidden;}
+.stApp { background: #0a0a0f; }
 
-.stApp {
-    background: #0a0a0f;
-}
-
-/* ── SIDEBAR — COMPACT & FUNCTIONAL ── */
+/* ── SIDEBAR ── */
 section[data-testid="stSidebar"] {
     background: #0d0d1a !important;
     border-right: 1px solid #1e1e3a !important;
     width: 280px !important;
 }
-
 section[data-testid="stSidebar"] > div:first-child {
     padding: 1rem 0.75rem !important;
 }
 
-/* Brand */
 .brand {
     text-align: center;
     padding: 0.5rem 0 1rem 0;
@@ -191,7 +178,7 @@ section[data-testid="stSidebar"] > div:first-child {
     text-transform: uppercase;
 }
 
-/* New Chat Button — PROMINENT */
+/* New Chat Button */
 .new-chat-btn {
     background: linear-gradient(135deg, #7c3aed, #2563eb) !important;
     color: white !important;
@@ -218,9 +205,6 @@ section[data-testid="stSidebar"] > div:first-child {
     text-transform: uppercase;
     letter-spacing: 1.5px;
     margin: 1rem 0 0.5rem 0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
 }
 
 .history-item {
@@ -231,16 +215,10 @@ section[data-testid="stSidebar"] > div:first-child {
     margin-bottom: 4px;
     cursor: pointer;
     transition: all 0.2s ease;
-    position: relative;
 }
 .history-item:hover {
     background: rgba(124,58,237,0.1);
     border-color: rgba(124,58,237,0.25);
-}
-.history-item.active {
-    background: rgba(124,58,237,0.15);
-    border-color: rgba(124,58,237,0.4);
-    border-left: 3px solid #7c3aed;
 }
 .history-title {
     font-size: 0.8rem;
@@ -248,32 +226,11 @@ section[data-testid="stSidebar"] > div:first-child {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 200px;
 }
 .history-date {
     font-size: 0.65rem;
     color: #475569;
     margin-top: 2px;
-}
-.history-delete {
-    position: absolute;
-    right: 6px;
-    top: 50%;
-    transform: translateY(-50%);
-    opacity: 0;
-    transition: opacity 0.2s;
-    color: #475569;
-    font-size: 0.75rem;
-    cursor: pointer;
-    padding: 2px 4px;
-    border-radius: 4px;
-}
-.history-item:hover .history-delete {
-    opacity: 1;
-}
-.history-delete:hover {
-    color: #ef4444;
-    background: rgba(239,68,68,0.1);
 }
 
 /* Mode Buttons */
@@ -295,13 +252,8 @@ section[data-testid="stSidebar"] > div:first-child {
     color: #a78bfa !important;
     transform: translateX(3px);
 }
-.mode-btn.active {
-    background: rgba(124,58,237,0.2) !important;
-    border-color: rgba(124,58,237,0.5) !important;
-    color: #a78bfa !important;
-}
 
-/* ── MAIN — TIGHT LAYOUT ── */
+/* ── MAIN ── */
 .main-wrapper {
     max-width: 800px;
     margin: 0 auto;
@@ -311,7 +263,6 @@ section[data-testid="stSidebar"] > div:first-child {
     height: calc(100vh - 80px);
 }
 
-/* Header — Compact */
 .main-header {
     text-align: center;
     padding: 1rem 0 0.5rem 0;
@@ -333,7 +284,6 @@ section[data-testid="stSidebar"] > div:first-child {
     letter-spacing: 0.3px;
 }
 
-/* Badges — Compact */
 .badge-row {
     display: flex;
     justify-content: center;
@@ -352,7 +302,7 @@ section[data-testid="stSidebar"] > div:first-child {
     font-weight: 500;
 }
 
-/* ── CHAT AREA — SCROLLABLE ── */
+/* ── CHAT ── */
 .chat-container {
     flex: 1;
     overflow-y: auto;
@@ -360,7 +310,6 @@ section[data-testid="stSidebar"] > div:first-child {
     min-height: 0;
 }
 
-/* Messages */
 .stChatMessage {
     background: #111122 !important;
     border: 1px solid #1e1e3a !important;
@@ -405,7 +354,7 @@ section[data-testid="stSidebar"] > div:first-child {
     line-height: 1.5 !important;
 }
 
-/* ── CHAT INPUT — FIXED TO BOTTOM ── */
+/* ── INPUT ── */
 .chat-input-wrapper {
     flex-shrink: 0;
     padding: 0.5rem 0 1rem 0;
@@ -440,7 +389,7 @@ section[data-testid="stSidebar"] > div:first-child {
     margin-right: 4px !important;
 }
 
-/* Welcome Card */
+/* Welcome */
 .welcome-card {
     background: linear-gradient(135deg, rgba(124,58,237,0.06), rgba(37,99,235,0.04));
     border: 1px solid rgba(124,58,237,0.12);
@@ -474,13 +423,10 @@ section[data-testid="stSidebar"] > div:first-child {
     font-size: 0.8rem;
 }
 
-/* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #2d2d5e; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #3d3d6e; }
 
-/* Responsive */
 @media (max-width: 768px) {
     .main-title { font-size: 2rem !important; }
     .badge-row { gap: 4px; }
@@ -489,9 +435,8 @@ section[data-testid="stSidebar"] > div:first-child {
 </style>
 """, unsafe_allow_html=True)
 
-# ── SIDEBAR — FUNCTIONAL ──
+# ── SIDEBAR ──
 with st.sidebar:
-    # Brand
     st.markdown("""
     <div class="brand">
         <div class="brand-name">ARIA</div>
@@ -499,34 +444,33 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # NEW CHAT BUTTON — Functional
+    # NEW CHAT BUTTON
     if st.button("➕ New Chat", key="new_chat_btn", use_container_width=True):
         create_new_session()
         st.rerun()
 
     st.markdown("---")
 
-    # CHAT HISTORY — Clickable
+    # CHAT HISTORY
     st.markdown('<div class="history-header">💬 Chat History</div>', unsafe_allow_html=True)
 
     if st.session_state.chat_history:
-        for session in st.session_state.chat_history[:20]:  # Show last 20
-            is_active = any(m["content"] == session["messages"][0]["content"] 
-                          for m in st.session_state.messages[:1]) if st.session_state.messages and session["messages"] else False
+        for session in st.session_state.chat_history[:20]:
+            # Use HTML for the history item to avoid f-string issues
+            st.markdown(f"""
+            <div class="history-item" onclick="window.parent.postMessage({{type: 'streamlit:setComponentValue', value: '{session['id']}'}}, '*')">
+                <div class="history-title">📄 {session['title']}</div>
+                <div class="history-date">{session['date']}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
-            cols = st.columns([0.85, 0.15])
-            with cols[0]:
-                if st.button(
-                    f"📄 {session['title']}
-
-{session['date']}",
-                    key=f"hist_{session['id']}",
-                    use_container_width=True,
-                    type="secondary"
-                ):
+            # Use columns for load/delete buttons
+            c1, c2 = st.columns([0.8, 0.2])
+            with c1:
+                if st.button(f"Load: {session['title'][:20]}", key=f"load_{session['id']}", use_container_width=True):
                     load_session(session["id"])
                     st.rerun()
-            with cols[1]:
+            with c2:
                 if st.button("🗑️", key=f"del_{session['id']}", help="Delete chat"):
                     delete_session(session["id"])
                     st.rerun()
@@ -535,7 +479,7 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # QUICK MODES — Functional
+    # QUICK MODES
     st.markdown('<div class="history-header">⚡ Quick Modes</div>', unsafe_allow_html=True)
 
     modes = [
@@ -577,10 +521,9 @@ with st.sidebar:
     </p>
     """, unsafe_allow_html=True)
 
-# ── MAIN CONTENT — TIGHT LAYOUT ──
+# ── MAIN CONTENT ──
 st.markdown('<div class="main-wrapper">', unsafe_allow_html=True)
 
-# Header
 st.markdown("""
 <div class="main-header">
     <div class="main-title">⚡ ARIA</div>
@@ -588,7 +531,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Badges
 st.markdown("""
 <div class="badge-row">
     <span class="badge">🤖 LLMs & RAG</span>
@@ -603,14 +545,13 @@ st.markdown("""
 
 st.divider()
 
-# Chat Messages Container
+# Chat Messages
 st.markdown('<div class="chat-container">', unsafe_allow_html=True)
 
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# Welcome message if empty
 if not st.session_state.messages:
     with st.chat_message("assistant"):
         st.markdown(f"""
@@ -636,9 +577,9 @@ I am **ARIA** — your dedicated AI & Automation Engineering assistant.
         </div>
         """, unsafe_allow_html=True)
 
-st.markdown('</div>', unsafe_allow_html=True)  # Close chat-container
+st.markdown('</div>', unsafe_allow_html=True)
 
-# Chat Input — Fixed at bottom
+# Chat Input
 st.markdown('<div class="chat-input-wrapper">', unsafe_allow_html=True)
 
 if user_input := st.chat_input("Ask ARIA anything — AI, automation, code, websites, data..."):
@@ -687,16 +628,12 @@ if user_input := st.chat_input("Ask ARIA anything — AI, automation, code, webs
     st.session_state.gemini_history.append({"role": "model", "parts": [{"text": reply}]})
     st.session_state.messages.append({"role": "assistant", "content": reply})
 
-    # Auto-save after each message
+    # Auto-save
     if len(st.session_state.messages) >= 2:
-        # Check if this session exists in history
-        current_first_msg = st.session_state.messages[0]["content"] if st.session_state.messages else ""
-        exists = any(
-            s["messages"] and s["messages"][0]["content"] == current_first_msg 
-            for s in st.session_state.chat_history
-        )
+        current_first = st.session_state.messages[0]["content"] if st.session_state.messages else ""
+        exists = any(s["messages"] and s["messages"][0]["content"] == current_first for s in st.session_state.chat_history)
         if not exists:
-            title = st.session_state.messages[0]["content"][:30] + "..." if len(st.session_state.messages[0]["content"]) > 30 else st.session_state.messages[0]["content"]
+            title = current_first[:30] + "..." if len(current_first) > 30 else current_first
             session = {
                 "id": datetime.now().strftime("%Y%m%d_%H%M%S"),
                 "title": title,
@@ -707,5 +644,5 @@ if user_input := st.chat_input("Ask ARIA anything — AI, automation, code, webs
             st.session_state.chat_history.insert(0, session)
             save_history(st.session_state.chat_history)
 
-st.markdown('</div>', unsafe_allow_html=True)  # Close chat-input-wrapper
-st.markdown('</div>', unsafe_allow_html=True)  # Close main-wrapper
+st.markdown('</div>', unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
