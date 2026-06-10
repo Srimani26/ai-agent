@@ -1,529 +1,721 @@
-import requests
 import streamlit as st
-from datetime import datetime
+import requests
 import json
+import time
+from datetime import datetime
+import uuid
+from supabase import create_client
 
-API_KEY = st.secrets["GEMINI_API_KEY"]
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={API_KEY}"
-today = datetime.now().strftime("%B %d, %Y")
-
-SUPABASE_HEADERS = {
-    "apikey": SUPABASE_KEY,
-    "Authorization": f"Bearer {SUPABASE_KEY}",
-    "Content-Type": "application/json",
-    "Prefer": "return=minimal"
-}
-
-SYSTEM_PROMPT = f"""You are ARIA — Advanced Reasoning & Intelligence Assistant.
-You are built exclusively for a professional AI Engineer and Automation Engineer.
-Today's date is {today}.
-
-CORE EXPERTISE:
-━━━━━━━━━━━━━━
-1. AI ENGINEERING
-   - LLM fine-tuning, RAG pipelines, vector databases (Pinecone, Weaviate, ChromaDB)
-   - AI agents with LangChain, LlamaIndex, AutoGen, CrewAI
-   - Embeddings, semantic search, prompt engineering
-   - Hugging Face, OpenAI, Gemini, Claude, Mistral APIs
-   - Model deployment, optimization, quantization
-
-2. AUTOMATION ENGINEERING
-   - n8n, Make.com, Zapier workflow design
-   - Python automation, Selenium, Playwright, BeautifulSoup
-   - API integrations, webhooks, scheduled tasks
-   - RPA, task orchestration, event-driven systems
-
-3. ADVANCED CODING
-   - Python (FastAPI, Django, Flask, async, decorators, OOP)
-   - JavaScript, TypeScript, React, Next.js, Node.js
-   - Docker, Kubernetes, CI/CD, GitHub Actions
-   - SQL, MongoDB, Redis, PostgreSQL
-   - Always write production-ready code with proper error handling
-
-4. WEBSITE & APP BUILDING
-   - Modern responsive websites with glassmorphism, animations
-   - Full-stack apps with React + FastAPI/Node.js
-   - Landing pages, dashboards, admin panels
-
-5. CURRENT TECH & AI NEWS
-   - Latest AI models, tools, frameworks as of {today}
-   - Industry trends, best practices, new releases
-
-RESPONSE RULES:
-- Write COMPLETE, production-ready, copy-paste code always
-- Use proper code blocks with language specified
-- Think like a SENIOR AI ENGINEER — precise, efficient, no fluff
-- Always suggest best practices and potential improvements"""
-
-# ── PAGE CONFIG ──
+# ─────────────────────────────────────────────
+#  PAGE CONFIG
+# ─────────────────────────────────────────────
 st.set_page_config(
-    page_title="ARIA — AI Assistant",
+    page_title="ARIA v2",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# ══════════════════════════════════
-# SUPABASE STORAGE FUNCTIONS
-# ══════════════════════════════════
+# ─────────────────────────────────────────────
+#  SECRETS
+# ─────────────────────────────────────────────
+GEMINI_API_KEY   = st.secrets["GEMINI_API_KEY"]
+GROQ_API_KEY     = st.secrets["GROQ_API_KEY"]
+SUPABASE_URL     = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY     = st.secrets["SUPABASE_KEY"]
 
-def load_history():
-    """Load all chat sessions from Supabase."""
+# Optional: for web search via Serper
+SERPER_API_KEY   = st.secrets.get("SERPER_API_KEY", "")
+
+# ─────────────────────────────────────────────
+#  CONSTANTS
+# ─────────────────────────────────────────────
+TODAY = datetime.now().strftime("%B %d, %Y")
+
+MODELS = {
+    "⚡ Gemini 2.5 Pro  (Best — Complex Tasks)": "gemini",
+    "🚀 Groq Llama 3.3 70B  (Fast — Quick Tasks)": "groq",
+    "🔥 Gemini 2.5 Flash  (Light — Simple Tasks)": "gemini-flash",
+}
+
+MODES = {
+    "🤖 AI Engineer": "ai_engineer",
+    "⚙️ Automation": "automation",
+    "🐍 Python Expert": "python",
+    "🌐 Web Builder": "web",
+    "📊 Data Analysis": "data",
+    "🏗️ Zoho / ERP": "zoho",
+    "💡 General Assistant": "general",
+}
+
+# ─────────────────────────────────────────────
+#  SYSTEM PROMPTS
+# ─────────────────────────────────────────────
+BASE_SYSTEM = f"""You are ARIA (Advanced Reasoning & Intelligence Assistant) — a highly capable personal AI built exclusively for Sri (Srimani26), AI Engineer at Standard Roofs, Erode, Tamil Nadu, India.
+
+## Your Core Identity
+You are Sri's personal AI — not a generic chatbot. You know his work deeply and think like a senior engineer + trusted advisor. You are honest, direct, and always give complete working solutions — never half answers.
+
+## Sri's Work Context (Always Keep This in Mind)
+- AI Engineer & Automation Engineer at Standard Roofs
+- Building a Roofing ERP SaaS on Zoho One (targeting Indian roofing companies)
+- ERP pricing: Starter / Growth / Business tier bundles
+- Zoho CRM with custom Deluge scripting (calculateRoofAreas function)
+- Sri AI Memory MCP Server (FastAPI + MCP — already built)
+- Google Ads AI Advisor project
+- AI Workspace / Knowledge Base system
+- Frontend background: HTML, CSS, JS, React
+- Strong Python: FastAPI, async, OOP
+- Tools: n8n, Make.com, LangChain, Supabase, ChromaDB
+
+## How You Think and Respond
+- For complex problems: think step by step, show your reasoning
+- For code: always give production-ready, complete, commented code
+- For errors: find the root cause — don't just patch symptoms
+- For business questions: give practical advice suited for Indian market
+- Never say "I can't" without offering an alternative
+- Be concise but never incomplete — quality over length
+- Today's date: {TODAY}
+
+## Your Personality
+- Direct and confident like a senior engineer
+- Honest — say when something is genuinely hard or uncertain  
+- Encouraging — Sri is 3.5 years into his career, building real things
+- No corporate fluff, no excessive disclaimers
+"""
+
+MODE_PROMPTS = {
+    "ai_engineer": "\n## Current Mode: AI Engineering\nFocus on LLMs, RAG pipelines, agents, MCP servers, vector databases, embeddings, prompt engineering, LangChain, and AI system architecture. Give deep technical answers with working code.",
+    "automation": "\n## Current Mode: Automation\nFocus on n8n workflows, Make.com scenarios, Python bots, Playwright, web scraping, API integrations, and task automation. Always give step-by-step implementation.",
+    "python": "\n## Current Mode: Python Expert\nFocus on production-ready Python: FastAPI, async/await, OOP patterns, error handling, performance optimization, decorators, and clean architecture.",
+    "web": "\n## Current Mode: Web Builder\nFocus on complete, modern websites with HTML/CSS/JS or React. Always give full working code with responsive design, dark/light themes, and clean UI.",
+    "data": "\n## Current Mode: Data Analysis\nFocus on pandas, data pipelines, visualization with plotly/matplotlib, data cleaning, SQL queries, and business insights.",
+    "zoho": "\n## Current Mode: Zoho / ERP Specialist\nFocus on Zoho One platform, Deluge scripting, CRM customization, Zoho Books, workflow automation, and the roofing ERP product Sri is building for Indian companies.",
+    "general": "\n## Current Mode: General Assistant\nBe a well-rounded assistant — answer anything clearly, think carefully, and give practical advice.",
+}
+
+# ─────────────────────────────────────────────
+#  SUPABASE CLIENT
+# ─────────────────────────────────────────────
+@st.cache_resource
+def get_supabase():
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# ─────────────────────────────────────────────
+#  WEB SEARCH (Optional — Serper)
+# ─────────────────────────────────────────────
+def web_search(query: str, num_results: int = 4) -> str:
+    if not SERPER_API_KEY:
+        return ""
     try:
-        resp = requests.get(
-            f"{SUPABASE_URL}/rest/v1/conversations?select=*&order=created_at.desc",
-            headers=SUPABASE_HEADERS,
-            timeout=10
+        response = requests.post(
+            "https://google.serper.dev/search",
+            headers={"X-API-KEY": SERPER_API_KEY, "Content-Type": "application/json"},
+            json={"q": query, "num": num_results},
+            timeout=8
         )
-        if resp.status_code == 200:
-            rows = resp.json()
-            sessions = []
-            for row in rows:
-                try:
-                    session = json.loads(row["content"])
-                    sessions.append(session)
-                except Exception:
-                    continue
-            return sessions
-        return []
-    except Exception:
-        return []
+        data = response.json()
+        results = []
+        for item in data.get("organic", [])[:num_results]:
+            results.append(f"- {item.get('title','')}: {item.get('snippet','')}")
+        return "\n".join(results) if results else ""
+    except:
+        return ""
 
-def save_session(session):
-    """Insert a new session into Supabase."""
+def needs_web_search(message: str) -> bool:
+    triggers = [
+        "latest", "current", "today", "now", "recent", "new",
+        "2024", "2025", "2026", "news", "update", "price",
+        "what is happening", "trending", "just released"
+    ]
+    msg_lower = message.lower()
+    return any(t in msg_lower for t in triggers)
+
+# ─────────────────────────────────────────────
+#  GEMINI API (Streaming)
+# ─────────────────────────────────────────────
+def call_gemini_stream(messages: list, system_prompt: str, model: str = "gemini-2.5-pro"):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?key={GEMINI_API_KEY}&alt=sse"
+
+    # Convert messages to Gemini format
+    contents = []
+    for msg in messages:
+        role = "user" if msg["role"] == "user" else "model"
+        contents.append({"role": role, "parts": [{"text": msg["content"]}]})
+
+    payload = {
+        "system_instruction": {"parts": [{"text": system_prompt}]},
+        "contents": contents,
+        "generationConfig": {
+            "temperature": 0.7,
+            "maxOutputTokens": 8192,
+            "thinkingConfig": {"thinkingBudget": 5000} if "pro" in model else {}
+        }
+    }
+
     try:
-        payload = {
-            "session_id": session["id"],
-            "role": "session_data",
-            "content": json.dumps(session),
+        response = requests.post(url, json=payload, stream=True, timeout=60)
+        for line in response.iter_lines():
+            if line:
+                line_str = line.decode("utf-8")
+                if line_str.startswith("data: "):
+                    try:
+                        data = json.loads(line_str[6:])
+                        candidates = data.get("candidates", [])
+                        if candidates:
+                            parts = candidates[0].get("content", {}).get("parts", [])
+                            for part in parts:
+                                text = part.get("text", "")
+                                if text:
+                                    yield text
+                    except:
+                        continue
+    except Exception as e:
+        yield f"\n\n⚠️ Gemini error: {str(e)}"
+
+# ─────────────────────────────────────────────
+#  GROQ API (Streaming)
+# ─────────────────────────────────────────────
+def call_groq_stream(messages: list, system_prompt: str):
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    groq_messages = [{"role": "system", "content": system_prompt}]
+    for msg in messages:
+        groq_messages.append({"role": msg["role"], "content": msg["content"]})
+
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": groq_messages,
+        "max_tokens": 8192,
+        "temperature": 0.7,
+        "stream": True
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=payload, stream=True, timeout=60)
+        for line in response.iter_lines():
+            if line:
+                line_str = line.decode("utf-8")
+                if line_str.startswith("data: ") and line_str != "data: [DONE]":
+                    try:
+                        data = json.loads(line_str[6:])
+                        delta = data["choices"][0].get("delta", {})
+                        text = delta.get("content", "")
+                        if text:
+                            yield text
+                    except:
+                        continue
+    except Exception as e:
+        yield f"\n\n⚠️ Groq error: {str(e)}"
+
+# ─────────────────────────────────────────────
+#  SMART MODEL ROUTER
+# ─────────────────────────────────────────────
+def stream_response(messages: list, system_prompt: str, model_choice: str):
+    """Route to correct model with auto-fallback"""
+
+    if model_choice == "gemini":
+        gen = call_gemini_stream(messages, system_prompt, "gemini-2.5-pro-preview-06-05")
+    elif model_choice == "gemini-flash":
+        gen = call_gemini_stream(messages, system_prompt, "gemini-2.5-flash")
+    else:
+        gen = call_groq_stream(messages, system_prompt)
+
+    full_text = ""
+    error_detected = False
+
+    for chunk in gen:
+        if "⚠️" in chunk:
+            error_detected = True
+        full_text += chunk
+        yield chunk
+
+    # Auto-fallback: if primary model failed, try Groq
+    if error_detected and model_choice == "gemini":
+        yield "\n\n🔄 **Switching to backup model (Groq)...**\n\n"
+        for chunk in call_groq_stream(messages, system_prompt):
+            yield chunk
+
+# ─────────────────────────────────────────────
+#  SUPABASE: SAVE & LOAD
+# ─────────────────────────────────────────────
+def save_message(session_id: str, role: str, content: str):
+    try:
+        supabase = get_supabase()
+        supabase.table("conversations").insert({
+            "session_id": session_id,
+            "role": role,
+            "content": content,
             "created_at": datetime.utcnow().isoformat()
-        }
-        requests.post(
-            f"{SUPABASE_URL}/rest/v1/conversations",
-            headers=SUPABASE_HEADERS,
-            json=payload,
-            timeout=10
-        )
-    except Exception:
+        }).execute()
+    except:
         pass
 
-def update_session(session):
-    """Update an existing session in Supabase."""
+def load_sessions() -> list:
     try:
-        payload = {"content": json.dumps(session)}
-        requests.patch(
-            f"{SUPABASE_URL}/rest/v1/conversations?session_id=eq.{session['id']}",
-            headers=SUPABASE_HEADERS,
-            json=payload,
-            timeout=10
-        )
-    except Exception:
-        pass
+        supabase = get_supabase()
+        result = supabase.table("conversations")\
+            .select("session_id, content, created_at")\
+            .eq("role", "user")\
+            .order("created_at", desc=True)\
+            .limit(50)\
+            .execute()
 
-def delete_session_db(session_id):
-    """Delete a session from Supabase."""
+        seen = {}
+        for row in result.data:
+            sid = row["session_id"]
+            if sid not in seen:
+                preview = row["content"][:45] + "..." if len(row["content"]) > 45 else row["content"]
+                seen[sid] = {"id": sid, "preview": preview, "time": row["created_at"][:10]}
+        return list(seen.values())[:15]
+    except:
+        return []
+
+def load_session_messages(session_id: str) -> list:
     try:
-        requests.delete(
-            f"{SUPABASE_URL}/rest/v1/conversations?session_id=eq.{session_id}",
-            headers=SUPABASE_HEADERS,
-            timeout=10
-        )
-    except Exception:
-        pass
+        supabase = get_supabase()
+        result = supabase.table("conversations")\
+            .select("role, content")\
+            .eq("session_id", session_id)\
+            .order("created_at")\
+            .execute()
+        return [{"role": r["role"], "content": r["content"]} for r in result.data]
+    except:
+        return []
 
-# ── SESSION MANAGEMENT ──
-
-def create_new_session():
-    current_messages = st.session_state.messages.copy()
-    if len(current_messages) > 0:
-        title = "New Chat"
-        for msg in current_messages:
-            if msg["role"] == "user":
-                title = msg["content"][:40] + "..." if len(msg["content"]) > 40 else msg["content"]
-                break
-        session = {
-            "id": datetime.now().strftime("%Y%m%d_%H%M%S"),
-            "title": title,
-            "date": datetime.now().strftime("%b %d, %H:%M"),
-            "messages": current_messages,
-            "mode": st.session_state.mode
-        }
-        st.session_state.chat_history.insert(0, session)
-        save_session(session)  # ✅ Save to Supabase
-    st.session_state.messages = []
-    st.session_state.gemini_history = [
-        {"role": "user", "parts": [{"text": SYSTEM_PROMPT}]},
-        {"role": "model", "parts": [{"text": "ARIA online. Ready to assist."}]}
-    ]
-
-def load_session(session_id):
-    for session in st.session_state.chat_history:
-        if session["id"] == session_id:
-            st.session_state.messages = session["messages"].copy()
-            gemini_hist = [
-                {"role": "user", "parts": [{"text": SYSTEM_PROMPT}]},
-                {"role": "model", "parts": [{"text": "ARIA online."}]}
-            ]
-            for msg in session["messages"]:
-                role = "user" if msg["role"] == "user" else "model"
-                gemini_hist.append({"role": role, "parts": [{"text": msg["content"]}]})
-            st.session_state.gemini_history = gemini_hist
-            st.session_state.mode = session.get("mode", "General")
-            break
-
-def delete_session(session_id):
-    st.session_state.chat_history = [s for s in st.session_state.chat_history if s["id"] != session_id]
-    delete_session_db(session_id)  # ✅ Delete from Supabase
-
-# ── SESSION INIT ──
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-if "gemini_history" not in st.session_state:
-    st.session_state.gemini_history = [
-        {"role": "user", "parts": [{"text": SYSTEM_PROMPT}]},
-        {"role": "model", "parts": [{"text": "ARIA online. Ready to assist."}]}
-    ]
-if "mode" not in st.session_state:
-    st.session_state.mode = "General"
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = load_history()  # ✅ Load from Supabase
-
-# ── CSS ──
+# ─────────────────────────────────────────────
+#  CUSTOM CSS — Dark, Professional, ARIA Identity
+# ─────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body, [class*="css"] { font-family: 'DM Sans', sans-serif; }
-#MainMenu, header, footer { visibility: hidden; }
-.stApp { background: #f5f4f0; }
-
-section[data-testid="stSidebar"] {
-    background: #1a1a2e !important;
-    border-right: none !important;
-    width: 260px !important;
-    box-shadow: 4px 0 24px rgba(0,0,0,0.12);
-}
-section[data-testid="stSidebar"] > div:first-child { padding: 0 !important; }
-
-.sb-brand { padding: 28px 20px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); }
-.sb-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
-.sb-logo-icon {
-    width: 34px; height: 34px;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    border-radius: 10px; display: flex; align-items: center;
-    justify-content: center; font-size: 16px; flex-shrink: 0;
-}
-.sb-logo-name { font-family: 'Syne', sans-serif; font-size: 1.35rem; font-weight: 800; color: #ffffff; letter-spacing: 1px; }
-.sb-logo-sub { font-size: 0.68rem; color: rgba(255,255,255,0.35); letter-spacing: 1.8px; text-transform: uppercase; padding-left: 44px; }
-
-.sb-actions { padding: 16px 16px 0; }
-div[data-testid="stButton"] button[kind="primary"] {
-    background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
-    color: white !important; border: none !important; border-radius: 10px !important;
-    font-family: 'DM Sans', sans-serif !important; font-weight: 600 !important;
-    font-size: 0.82rem !important; padding: 10px 0 !important;
-    transition: all 0.2s ease !important;
-    box-shadow: 0 4px 12px rgba(99,102,241,0.3) !important;
-}
-div[data-testid="stButton"] button[kind="primary"]:hover {
-    transform: translateY(-1px) !important;
-    box-shadow: 0 6px 18px rgba(99,102,241,0.4) !important;
+/* Root */
+:root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --border: #2a2a3a;
+    --accent: #7c6af7;
+    --accent2: #a78bfa;
+    --green: #34d399;
+    --text: #e8e8f0;
+    --text-muted: #8888aa;
+    --user-bg: #1e1b4b;
+    --ai-bg: #111118;
 }
 
-.sb-section { padding: 20px 20px 8px; font-size: 0.62rem; font-weight: 700; color: rgba(255,255,255,0.25); text-transform: uppercase; letter-spacing: 2px; }
-
-.hist-item { margin: 0 10px 2px; border-radius: 9px; padding: 9px 12px; cursor: pointer; border: 1px solid transparent; transition: all 0.18s ease; }
-.hist-item:hover { background: rgba(99,102,241,0.12); border-color: rgba(99,102,241,0.2); }
-.hist-title { font-size: 0.78rem; color: rgba(255,255,255,0.75); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 2px; }
-.hist-date { font-size: 0.65rem; color: rgba(255,255,255,0.28); }
-
-section[data-testid="stSidebar"] div[data-testid="stButton"] button {
-    background: transparent !important; border: none !important;
-    color: rgba(255,255,255,0.5) !important; font-size: 0.72rem !important;
-    padding: 3px 6px !important; border-radius: 6px !important;
-    text-align: left !important; white-space: nowrap !important;
-    overflow: hidden !important; text-overflow: ellipsis !important;
-    transition: all 0.15s ease !important;
-}
-section[data-testid="stSidebar"] div[data-testid="stButton"] button:hover {
-    background: rgba(255,255,255,0.07) !important; color: rgba(255,255,255,0.85) !important;
+html, body, [data-testid="stApp"] {
+    background: var(--bg) !important;
+    font-family: 'Inter', sans-serif !important;
+    color: var(--text) !important;
 }
 
-.mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 0 14px 16px; }
+/* Hide Streamlit branding */
+#MainMenu, footer, header { visibility: hidden; }
+[data-testid="stToolbar"] { display: none; }
 
-.sb-stats { display: flex; gap: 8px; padding: 0 14px 20px; }
-.stat-box { flex: 1; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 10px 8px; text-align: center; }
-.stat-num { font-size: 1.1rem; font-weight: 700; color: #a5b4fc; font-family: 'Syne', sans-serif; }
-.stat-lbl { font-size: 0.58rem; color: rgba(255,255,255,0.25); text-transform: uppercase; letter-spacing: 0.8px; margin-top: 2px; }
-
-.block-container { padding: 2rem 2rem 0 2rem !important; max-width: 860px !important; }
-
-.main-header {
-    background: white; border-radius: 16px; padding: 24px 28px; margin-bottom: 20px;
-    border: 1px solid rgba(0,0,0,0.06); display: flex; align-items: center;
-    justify-content: space-between; box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+/* Sidebar */
+[data-testid="stSidebar"] {
+    background: var(--surface) !important;
+    border-right: 1px solid var(--border) !important;
 }
-.hdr-left { display: flex; align-items: center; gap: 16px; }
-.hdr-icon {
-    width: 48px; height: 48px;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    border-radius: 14px; display: flex; align-items: center; justify-content: center;
-    font-size: 22px; flex-shrink: 0; box-shadow: 0 4px 14px rgba(99,102,241,0.3);
+[data-testid="stSidebar"] * { color: var(--text) !important; }
+
+/* ARIA Header */
+.aria-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0 24px 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
 }
-.hdr-title { font-family: 'Syne', sans-serif; font-size: 1.6rem; font-weight: 800; color: #0f0f1a; letter-spacing: 0.5px; line-height: 1; margin-bottom: 3px; }
-.hdr-sub { font-size: 0.8rem; color: #6b7280; font-weight: 400; }
-.hdr-mode { background: #f0f0ff; border: 1px solid #c7d2fe; border-radius: 8px; padding: 6px 14px; font-size: 0.75rem; font-weight: 600; color: #4f46e5; letter-spacing: 0.3px; }
+.aria-logo {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, var(--accent), #ec4899);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 700;
+    color: white; flex-shrink: 0;
+}
+.aria-title { font-size: 18px; font-weight: 700; color: var(--text); }
+.aria-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
-.caps-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
-.cap-pill { background: white; border: 1px solid rgba(0,0,0,0.08); border-radius: 20px; padding: 6px 14px; font-size: 0.75rem; font-weight: 500; color: #374151; box-shadow: 0 1px 4px rgba(0,0,0,0.04); display: inline-flex; align-items: center; gap: 5px; }
+/* Status badge */
+.status-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #0d2818; border: 1px solid #065f46;
+    color: var(--green); padding: 4px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 500; margin-bottom: 16px;
+}
+.status-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s infinite;
+}
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
 
-.stChatMessage { background: white !important; border: 1px solid rgba(0,0,0,0.07) !important; border-radius: 14px !important; padding: 16px 20px !important; margin-bottom: 10px !important; box-shadow: 0 1px 6px rgba(0,0,0,0.04) !important; }
-.stChatMessage[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) { background: #f5f3ff !important; border-color: #ddd6fe !important; }
-.stChatMessage p, .stChatMessage li { color: #1f2937 !important; line-height: 1.7 !important; font-size: 0.9rem !important; }
-.stChatMessage h1, .stChatMessage h2, .stChatMessage h3 { color: #111827 !important; font-family: 'Syne', sans-serif !important; margin: 16px 0 8px 0 !important; font-weight: 700 !important; }
-.stChatMessage h3 { font-size: 1rem !important; color: #4f46e5 !important; }
-.stChatMessage code:not(pre code) { font-family: 'DM Mono', monospace !important; background: #f0f0ff !important; color: #4f46e5 !important; border-radius: 5px !important; padding: 2px 7px !important; font-size: 0.82em !important; border: 1px solid #e0e7ff !important; }
-.stChatMessage pre { background: #0f0f1a !important; border: 1px solid rgba(255,255,255,0.06) !important; border-left: 3px solid #6366f1 !important; border-radius: 12px !important; padding: 18px 20px !important; margin: 14px 0 !important; overflow-x: auto !important; }
-.stChatMessage pre code { font-family: 'DM Mono', monospace !important; color: #e2e8f0 !important; background: transparent !important; font-size: 0.83rem !important; line-height: 1.6 !important; }
-.stChatMessage [data-testid="chatAvatarIcon-assistant"] { background: linear-gradient(135deg, #6366f1, #8b5cf6) !important; border-radius: 10px !important; }
-.stChatMessage [data-testid="chatAvatarIcon-user"] { background: #ddd6fe !important; border-radius: 10px !important; }
+/* Section labels */
+.sidebar-label {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+    color: var(--text-muted); text-transform: uppercase;
+    margin: 16px 0 8px 0;
+}
 
-.welcome-wrap { background: white; border: 1px solid rgba(0,0,0,0.07); border-radius: 16px; padding: 28px; box-shadow: 0 2px 12px rgba(0,0,0,0.04); }
-.welcome-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
-.cap-card { background: #fafafa; border: 1px solid rgba(0,0,0,0.06); border-radius: 10px; padding: 14px 16px; transition: all 0.2s ease; }
-.cap-card:hover { border-color: #c7d2fe; background: #f5f3ff; }
-.cap-icon { font-size: 1.1rem; margin-bottom: 6px; }
-.cap-title { font-size: 0.8rem; font-weight: 600; color: #111827; margin-bottom: 3px; }
-.cap-desc { font-size: 0.72rem; color: #6b7280; line-height: 1.5; }
+/* Chat messages */
+.message-wrap { padding: 6px 0; }
 
-.stChatInputContainer { background: white !important; border: 1.5px solid #e5e7eb !important; border-radius: 14px !important; box-shadow: 0 4px 20px rgba(0,0,0,0.06) !important; transition: all 0.2s ease !important; }
-.stChatInputContainer:focus-within { border-color: #6366f1 !important; box-shadow: 0 0 0 4px rgba(99,102,241,0.08), 0 4px 20px rgba(0,0,0,0.06) !important; }
-.stChatInputContainer textarea { color: #111827 !important; background: transparent !important; font-family: 'DM Sans', sans-serif !important; font-size: 0.9rem !important; line-height: 1.6 !important; caret-color: #6366f1 !important; }
-.stChatInputContainer textarea::placeholder { color: #9ca3af !important; }
-.stChatInputContainer button { background: linear-gradient(135deg, #6366f1, #8b5cf6) !important; border: none !important; border-radius: 10px !important; color: white !important; box-shadow: 0 2px 8px rgba(99,102,241,0.3) !important; margin: 4px !important; }
-.stChatInputContainer button:hover { transform: scale(1.05) !important; }
+.user-msg {
+    display: flex; justify-content: flex-end; margin: 8px 0;
+}
+.user-bubble {
+    background: var(--user-bg);
+    border: 1px solid #312e81;
+    border-radius: 16px 16px 4px 16px;
+    padding: 12px 16px;
+    max-width: 72%;
+    font-size: 14px; line-height: 1.6;
+    color: #c7d2fe;
+}
 
-hr { border: none !important; border-top: 1px solid rgba(0,0,0,0.07) !important; margin: 12px 0 !important; }
-::-webkit-scrollbar { width: 5px; }
+.ai-msg {
+    display: flex; gap: 10px; margin: 8px 0; align-items: flex-start;
+}
+.ai-avatar {
+    width: 28px; height: 28px; flex-shrink: 0;
+    background: linear-gradient(135deg, var(--accent), #ec4899);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: white;
+    margin-top: 2px;
+}
+.ai-bubble {
+    background: var(--ai-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px 16px 16px 16px;
+    padding: 14px 18px;
+    max-width: 82%;
+    font-size: 14px; line-height: 1.7;
+    color: var(--text);
+}
+
+/* Code blocks */
+.ai-bubble code {
+    background: #1e1e2e !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 6px !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 12px !important;
+    color: #cdd6f4 !important;
+    padding: 2px 6px !important;
+}
+.ai-bubble pre {
+    background: #1e1e2e !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 10px !important;
+    padding: 16px !important;
+    overflow-x: auto !important;
+}
+
+/* Input area */
+[data-testid="stChatInput"] {
+    background: var(--surface2) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 14px !important;
+    color: var(--text) !important;
+}
+[data-testid="stChatInput"]:focus-within {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px rgba(124, 106, 247, 0.15) !important;
+}
+
+/* Selectbox */
+[data-testid="stSelectbox"] > div {
+    background: var(--surface2) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 8px !important;
+    color: var(--text) !important;
+}
+
+/* Buttons */
+.stButton > button {
+    background: var(--surface2) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text) !important;
+    border-radius: 8px !important;
+    font-size: 12px !important;
+    transition: all 0.2s !important;
+}
+.stButton > button:hover {
+    border-color: var(--accent) !important;
+    color: var(--accent2) !important;
+    background: rgba(124, 106, 247, 0.08) !important;
+}
+
+/* Session history items */
+.session-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin: 4px 0;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-muted);
+    transition: all 0.2s;
+}
+.session-item:hover {
+    border-color: var(--accent);
+    color: var(--text);
+}
+
+/* Welcome screen */
+.welcome-wrap {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    min-height: 60vh; text-align: center;
+    padding: 40px 20px;
+}
+.welcome-logo {
+    width: 72px; height: 72px;
+    background: linear-gradient(135deg, var(--accent), #ec4899);
+    border-radius: 20px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px; font-weight: 700; color: white;
+    margin: 0 auto 20px;
+    box-shadow: 0 0 40px rgba(124, 106, 247, 0.3);
+}
+.welcome-title {
+    font-size: 28px; font-weight: 700;
+    background: linear-gradient(135deg, var(--accent2), #ec4899);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+}
+.welcome-sub {
+    color: var(--text-muted); font-size: 14px; margin-bottom: 32px;
+    max-width: 420px;
+}
+.quick-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 10px; max-width: 480px; width: 100%;
+}
+.quick-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 16px;
+    text-align: left; cursor: pointer;
+    transition: all 0.2s;
+}
+.quick-card:hover { border-color: var(--accent); }
+.quick-card-icon { font-size: 20px; margin-bottom: 6px; }
+.quick-card-title { font-size: 12px; font-weight: 600; color: var(--text); }
+.quick-card-desc { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+/* Search indicator */
+.search-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: #1a1a0a; border: 1px solid #854d0e;
+    color: #fbbf24; padding: 3px 10px; border-radius: 20px;
+    font-size: 11px; margin-bottom: 8px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
-.stSpinner > div { border-top-color: #6366f1 !important; }
-.main > div { padding-top: 0 !important; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* Main content padding */
+.main .block-container {
+    max-width: 860px !important;
+    padding: 1rem 2rem 6rem !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# ══════════════════════════════════
-# SIDEBAR
-# ══════════════════════════════════
+# ─────────────────────────────────────────────
+#  SESSION STATE
+# ─────────────────────────────────────────────
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+if "model_choice" not in st.session_state:
+    st.session_state.model_choice = "gemini"
+if "mode" not in st.session_state:
+    st.session_state.mode = "general"
+if "web_search_on" not in st.session_state:
+    st.session_state.web_search_on = bool(SERPER_API_KEY)
+
+# ─────────────────────────────────────────────
+#  SIDEBAR
+# ─────────────────────────────────────────────
 with st.sidebar:
+    # Header
     st.markdown("""
-    <div class="sb-brand">
-        <div class="sb-logo">
-            <div class="sb-logo-icon">⚡</div>
-            <div class="sb-logo-name">ARIA</div>
-        </div>
-        <div class="sb-logo-sub">AI Engineering Assistant</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown('<div class="sb-actions">', unsafe_allow_html=True)
-    if st.button("＋  New Chat", key="new_chat_btn", use_container_width=True, type="primary"):
-        create_new_session()
-        st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown('<div class="sb-section">Recent Chats</div>', unsafe_allow_html=True)
-
-    if st.session_state.chat_history:
-        for session in st.session_state.chat_history[:15]:
-            st.markdown(f"""
-            <div class="hist-item">
-                <div class="hist-title">📄 {session['title']}</div>
-                <div class="hist-date">{session['date']}</div>
-            </div>
-            """, unsafe_allow_html=True)
-            c1, c2 = st.columns([5, 1])
-            with c1:
-                if st.button(f"↩ {session['title'][:22]}", key=f"load_{session['id']}", use_container_width=True):
-                    load_session(session["id"])
-                    st.rerun()
-            with c2:
-                if st.button("✕", key=f"del_{session['id']}", help="Delete"):
-                    delete_session(session["id"])
-                    st.rerun()
-    else:
-        st.markdown('<p style="font-size:0.73rem;color:rgba(255,255,255,0.22);text-align:center;padding:16px 0">No previous chats</p>', unsafe_allow_html=True)
-
-    st.markdown('<div class="sb-section">Mode</div>', unsafe_allow_html=True)
-
-    modes = [
-        ("🤖 AI Eng", "AI Engineer"),
-        ("⚙️ Automation", "Automation"),
-        ("🌐 Web Build", "Web Builder"),
-        ("🐍 Python", "Python"),
-        ("📊 Data", "Data Analysis"),
-        ("💬 General", "General"),
-    ]
-
-    st.markdown('<div class="mode-grid">', unsafe_allow_html=True)
-    for label, mode_key in modes:
-        btn_type = "primary" if st.session_state.mode == mode_key else "secondary"
-        if st.button(label, key=f"mode_{mode_key}", use_container_width=True, type=btn_type):
-            st.session_state.mode = mode_key
-            st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    total_msgs = len(st.session_state.messages)
-    total_hist = len(st.session_state.chat_history)
-    st.markdown(f"""
-    <div class="sb-stats">
-        <div class="stat-box">
-            <div class="stat-num">{total_msgs}</div>
-            <div class="stat-lbl">Messages</div>
-        </div>
-        <div class="stat-box">
-            <div class="stat-num">{total_hist}</div>
-            <div class="stat-lbl">Saved</div>
-        </div>
-    </div>
-    <p style="font-size:0.6rem;color:rgba(255,255,255,0.15);text-align:center;padding-bottom:12px">
-        Powered by Gemini 2.5 Flash ☁️ Supabase
-    </p>
-    """, unsafe_allow_html=True)
-
-# ══════════════════════════════════
-# MAIN CONTENT
-# ══════════════════════════════════
-
-mode_label = {
-    "AI Engineer": "🤖 AI Engineering",
-    "Automation": "⚙️ Automation",
-    "Web Builder": "🌐 Web Builder",
-    "Python": "🐍 Python",
-    "Data Analysis": "📊 Data Analysis",
-    "General": "💬 General"
-}.get(st.session_state.mode, "💬 General")
-
-st.markdown(f"""
-<div class="main-header">
-    <div class="hdr-left">
-        <div class="hdr-icon">⚡</div>
+    <div class="aria-header">
+        <div class="aria-logo">A</div>
         <div>
-            <div class="hdr-title">ARIA</div>
-            <div class="hdr-sub">Advanced Reasoning & Intelligence Assistant</div>
+            <div class="aria-title">ARIA v2</div>
+            <div class="aria-sub">Sri's Personal AI Assistant</div>
         </div>
     </div>
-    <div class="hdr-mode">{mode_label}</div>
-</div>
-""", unsafe_allow_html=True)
+    <div class="status-badge">
+        <div class="status-dot"></div>
+        Online & Ready
+    </div>
+    """, unsafe_allow_html=True)
 
-st.markdown("""
-<div class="caps-row">
-    <span class="cap-pill">🔗 LLMs & RAG</span>
-    <span class="cap-pill">⚙️ n8n · Make.com</span>
-    <span class="cap-pill">🐍 Python</span>
-    <span class="cap-pill">🌐 Web Builder</span>
-    <span class="cap-pill">📊 Data Analysis</span>
-    <span class="cap-pill">🔌 API Integration</span>
-    <span class="cap-pill">🚀 Deployment</span>
-</div>
-""", unsafe_allow_html=True)
+    # Model selector
+    st.markdown('<div class="sidebar-label">AI Model</div>', unsafe_allow_html=True)
+    model_label = st.selectbox(
+        "Model", list(MODELS.keys()), label_visibility="collapsed"
+    )
+    st.session_state.model_choice = MODELS[model_label]
 
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+    # Mode selector
+    st.markdown('<div class="sidebar-label">Work Mode</div>', unsafe_allow_html=True)
+    mode_label = st.selectbox(
+        "Mode", list(MODES.keys()), label_visibility="collapsed"
+    )
+    st.session_state.mode = MODES[mode_label]
 
+    # Web search toggle
+    if SERPER_API_KEY:
+        st.markdown('<div class="sidebar-label">Features</div>', unsafe_allow_html=True)
+        st.session_state.web_search_on = st.toggle(
+            "🌐 Web Search", value=st.session_state.web_search_on
+        )
+
+    # New session
+    st.markdown('<div class="sidebar-label">Session</div>', unsafe_allow_html=True)
+    if st.button("✨ New Conversation", use_container_width=True):
+        st.session_state.session_id = str(uuid.uuid4())
+        st.session_state.messages = []
+        st.rerun()
+
+    # Session history
+    st.markdown('<div class="sidebar-label">Recent Chats</div>', unsafe_allow_html=True)
+    sessions = load_sessions()
+    for s in sessions[:8]:
+        if s["id"] != st.session_state.session_id:
+            if st.button(f"💬 {s['preview']}", key=s["id"], use_container_width=True):
+                st.session_state.session_id = s["id"]
+                st.session_state.messages = load_session_messages(s["id"])
+                st.rerun()
+
+    # Info
+    st.markdown("---")
+    st.markdown(f"""
+    <div style="font-size:11px; color:#555577; text-align:center; line-height:1.6">
+        Built by Srimani26<br>
+        Powered by Gemini + Groq<br>
+        {TODAY}
+    </div>
+    """, unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────
+#  MAIN CHAT AREA
+# ─────────────────────────────────────────────
+
+# Welcome screen
 if not st.session_state.messages:
-    with st.chat_message("assistant"):
+    st.markdown("""
+    <div class="welcome-wrap">
+        <div class="welcome-logo">A</div>
+        <div class="welcome-title">ARIA is ready, Sri.</div>
+        <div class="welcome-sub">
+            Your personal AI — built for complex engineering, automation,
+            Zoho ERP, coding, and everything in between.
+        </div>
+        <div class="quick-grid">
+            <div class="quick-card">
+                <div class="quick-card-icon">🤖</div>
+                <div class="quick-card-title">AI Engineering</div>
+                <div class="quick-card-desc">LLMs, RAG, agents, MCP</div>
+            </div>
+            <div class="quick-card">
+                <div class="quick-card-icon">🏗️</div>
+                <div class="quick-card-title">Zoho ERP</div>
+                <div class="quick-card-desc">Deluge, CRM, workflows</div>
+            </div>
+            <div class="quick-card">
+                <div class="quick-card-icon">⚙️</div>
+                <div class="quick-card-title">Automation</div>
+                <div class="quick-card-desc">n8n, Make, Python bots</div>
+            </div>
+            <div class="quick-card">
+                <div class="quick-card-icon">🐍</div>
+                <div class="quick-card-title">Python Expert</div>
+                <div class="quick-card-desc">FastAPI, async, production code</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# Render chat history
+for msg in st.session_state.messages:
+    if msg["role"] == "user":
         st.markdown(f"""
-        <div class="welcome-wrap">
-            <div style="font-family:'Syne',sans-serif;font-size:1.15rem;font-weight:700;color:#0f0f1a;margin-bottom:4px">
-                👋 Welcome back, Engineer!
-            </div>
-            <div style="font-size:0.83rem;color:#6b7280;line-height:1.6">
-                I'm <strong>ARIA</strong> — your dedicated AI &amp; Automation Engineering assistant. Today is <strong>{today}</strong>. Chats are now saved permanently to Supabase ☁️
-            </div>
-            <div class="welcome-grid">
-                <div class="cap-card"><div class="cap-icon">🤖</div><div class="cap-title">AI Engineering</div><div class="cap-desc">LLMs, RAG pipelines, agents, vector databases, embeddings</div></div>
-                <div class="cap-card"><div class="cap-icon">⚙️</div><div class="cap-title">Automation</div><div class="cap-desc">n8n, Make.com, Python bots, Playwright, Selenium</div></div>
-                <div class="cap-card"><div class="cap-icon">🌐</div><div class="cap-title">Web Builder</div><div class="cap-desc">Full-stack apps, landing pages, dashboards, React + FastAPI</div></div>
-                <div class="cap-card"><div class="cap-icon">🐍</div><div class="cap-title">Python Expert</div><div class="cap-desc">FastAPI, async, OOP, production patterns, data pipelines</div></div>
-                <div class="cap-card"><div class="cap-icon">📊</div><div class="cap-title">Data Analysis</div><div class="cap-desc">Pandas, NumPy, visualization, insights, ML pipelines</div></div>
-                <div class="cap-card"><div class="cap-icon">🔌</div><div class="cap-title">API Integration</div><div class="cap-desc">REST, webhooks, OAuth, OpenAI, Gemini, Claude APIs</div></div>
-            </div>
+        <div class="user-msg">
+            <div class="user-bubble">{msg["content"]}</div>
         </div>
         """, unsafe_allow_html=True)
+    else:
+        with st.chat_message("assistant", avatar="⚡"):
+            st.markdown(msg["content"])
 
-mode_context = {
-    "AI Engineer": "As a senior AI engineer, be highly technical and precise. ",
-    "Automation": "As an automation expert, give complete working code and workflows. ",
-    "Web Builder": "Build a complete, stunning, modern website. Full HTML/CSS/JS in one file. ",
-    "Python": "As a Python expert, write clean, production-ready Python. ",
-    "Data Analysis": "As a data engineer, be analytical, use pandas/numpy, give insights. ",
-    "General": ""
-}
+# ─────────────────────────────────────────────
+#  CHAT INPUT
+# ─────────────────────────────────────────────
+if prompt := st.chat_input("Ask ARIA anything..."):
 
-if user_input := st.chat_input(f"Ask ARIA anything — AI, automation, code, websites, data..."):
-    with st.chat_message("user"):
-        st.markdown(user_input)
-    st.session_state.messages.append({"role": "user", "content": user_input})
+    # Build system prompt
+    mode_key = st.session_state.mode
+    system_prompt = BASE_SYSTEM + MODE_PROMPTS.get(mode_key, "")
 
-    enhanced = mode_context.get(st.session_state.mode, "") + user_input
-    st.session_state.gemini_history.append({"role": "user", "parts": [{"text": enhanced}]})
+    # Web search injection
+    search_context = ""
+    if st.session_state.web_search_on and needs_web_search(prompt):
+        with st.spinner("🌐 Searching web..."):
+            search_results = web_search(prompt)
+            if search_results:
+                search_context = f"\n\n## Live Web Search Results\n{search_results}\n\nUse the above search results to give an accurate, up-to-date answer.\n"
+                system_prompt += search_context
+                st.markdown('<div class="search-badge">🌐 Web search used</div>', unsafe_allow_html=True)
 
-    with st.chat_message("assistant"):
-        with st.spinner("ARIA is thinking..."):
-            try:
-                data = {
-                    "contents": st.session_state.gemini_history,
-                    "generationConfig": {
-                        "temperature": 0.7,
-                        "topP": 0.9,
-                        "maxOutputTokens": 8192
-                    }
-                }
-                resp = requests.post(GEMINI_URL, json=data, timeout=60)
-                result = resp.json()
+    # Show user message
+    st.markdown(f"""
+    <div class="user-msg">
+        <div class="user-bubble">{prompt}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-                if "candidates" in result:
-                    reply = result["candidates"][0]["content"]["parts"][0]["text"]
-                else:
-                    reply = f"⚠️ Error: {result.get('error', {}).get('message', 'Please try again.')}"
+    # Add to history
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    save_message(st.session_state.session_id, "user", prompt)
 
-            except requests.exceptions.Timeout:
-                reply = "⏱️ Request timed out — please try again."
-            except Exception as e:
-                reply = f"⚠️ Error: {str(e)}"
+    # Build messages for API (keep last 20 for context)
+    api_messages = st.session_state.messages[-20:]
 
-        st.markdown(reply)
+    # Stream response
+    with st.chat_message("assistant", avatar="⚡"):
+        placeholder = st.empty()
+        full_response = ""
 
-    st.session_state.gemini_history.append({"role": "model", "parts": [{"text": reply}]})
-    st.session_state.messages.append({"role": "assistant", "content": reply})
+        for chunk in stream_response(api_messages, system_prompt, st.session_state.model_choice):
+            full_response += chunk
+            placeholder.markdown(full_response + "▌")
 
-    # ✅ Auto-save / update session to Supabase
-    if len(st.session_state.messages) >= 2:
-        current_first = st.session_state.messages[0]["content"] if st.session_state.messages else ""
-        existing = next((s for s in st.session_state.chat_history if s["messages"] and s["messages"][0]["content"] == current_first), None)
+        placeholder.markdown(full_response)
 
-        if existing:
-            # Update existing session with latest messages
-            existing["messages"] = st.session_state.messages.copy()
-            existing["mode"] = st.session_state.mode
-            update_session(existing)
-        else:
-            # Create brand new session
-            title = current_first[:40] + "..." if len(current_first) > 40 else current_first
-            session = {
-                "id": datetime.now().strftime("%Y%m%d_%H%M%S"),
-                "title": title,
-                "date": datetime.now().strftime("%b %d, %H:%M"),
-                "messages": st.session_state.messages.copy(),
-                "mode": st.session_state.mode
-            }
-            st.session_state.chat_history.insert(0, session)
-            save_session(session)
+    # Save assistant response
+    st.session_state.messages.append({"role": "assistant", "content": full_response})
+    save_message(st.session_state.session_id, "assistant", full_response)
