@@ -6,716 +6,612 @@ from datetime import datetime
 import uuid
 from supabase import create_client
 
-# ─────────────────────────────────────────────
-#  PAGE CONFIG
-# ─────────────────────────────────────────────
 st.set_page_config(
-    page_title="ARIA v2",
+    page_title="ARIA — Sri's AI",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# ─────────────────────────────────────────────
-#  SECRETS
-# ─────────────────────────────────────────────
-GEMINI_API_KEY   = st.secrets["GEMINI_API_KEY"]
-GROQ_API_KEY     = st.secrets["GROQ_API_KEY"]
-SUPABASE_URL     = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY     = st.secrets["SUPABASE_KEY"]
-
-# Optional: for web search via Serper
-SERPER_API_KEY   = st.secrets.get("SERPER_API_KEY", "")
-
-# ─────────────────────────────────────────────
-#  CONSTANTS
-# ─────────────────────────────────────────────
+# ── SECRETS ──────────────────────────────────────────────────────────────────
+GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+GROQ_API_KEY   = st.secrets["GROQ_API_KEY"]
+SUPABASE_URL   = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY   = st.secrets["SUPABASE_KEY"]
+SERPER_API_KEY = st.secrets.get("SERPER_API_KEY", "")
 TODAY = datetime.now().strftime("%B %d, %Y")
 
+# ── MODELS & MODES ────────────────────────────────────────────────────────────
 MODELS = {
-    "⚡ Gemini 2.5 Pro  (Best — Complex Tasks)": "gemini",
-    "🚀 Groq Llama 3.3 70B  (Fast — Quick Tasks)": "groq",
-    "🔥 Gemini 2.5 Flash  (Light — Simple Tasks)": "gemini-flash",
+    "Gemini 2.5 Pro  ·  Best quality": "gemini-pro",
+    "Groq Llama 3.3  ·  Fastest":      "groq",
+    "Gemini 2.5 Flash  ·  Light tasks": "gemini-flash",
 }
-
 MODES = {
-    "🤖 AI Engineer": "ai_engineer",
-    "⚙️ Automation": "automation",
-    "🐍 Python Expert": "python",
-    "🌐 Web Builder": "web",
-    "📊 Data Analysis": "data",
-    "🏗️ Zoho / ERP": "zoho",
-    "💡 General Assistant": "general",
+    "🤖  AI Engineering":   "ai_engineer",
+    "🏗️  Zoho / ERP":        "zoho",
+    "⚙️  Automation":        "automation",
+    "🐍  Python Expert":     "python",
+    "🌐  Web Builder":       "web",
+    "💡  General":           "general",
 }
 
-# ─────────────────────────────────────────────
-#  SYSTEM PROMPTS
-# ─────────────────────────────────────────────
-BASE_SYSTEM = f"""You are ARIA (Advanced Reasoning & Intelligence Assistant) — a highly capable personal AI built exclusively for Sri (Srimani26), AI Engineer at Standard Roofs, Erode, Tamil Nadu, India.
+# ── SYSTEM PROMPTS ────────────────────────────────────────────────────────────
+BASE = f"""You are ARIA — Advanced Reasoning & Intelligence Assistant.
+You are Sri's (Srimani26) exclusive personal AI. Sri is an AI Engineer & Automation Engineer at Standard Roofs, Erode, Tamil Nadu.
 
-## Your Core Identity
-You are Sri's personal AI — not a generic chatbot. You know his work deeply and think like a senior engineer + trusted advisor. You are honest, direct, and always give complete working solutions — never half answers.
-
-## Sri's Work Context (Always Keep This in Mind)
-- AI Engineer & Automation Engineer at Standard Roofs
-- Building a Roofing ERP SaaS on Zoho One (targeting Indian roofing companies)
-- ERP pricing: Starter / Growth / Business tier bundles
-- Zoho CRM with custom Deluge scripting (calculateRoofAreas function)
-- Sri AI Memory MCP Server (FastAPI + MCP — already built)
+## Sri's full context
+- Building Roofing ERP SaaS on Zoho One for Indian roofing companies
+- ERP pricing tiers: Starter / Growth / Business (bundled with Zoho One licenses)
+- Zoho CRM with custom Deluge function: calculateRoofAreas (multi-section, slope/extension logic)
+- Sri AI Memory MCP server — FastAPI + MCP (already live on Render)
 - Google Ads AI Advisor project
-- AI Workspace / Knowledge Base system
 - Frontend background: HTML, CSS, JS, React
-- Strong Python: FastAPI, async, OOP
+- Python stack: FastAPI, async, Pydantic, OOP
 - Tools: n8n, Make.com, LangChain, Supabase, ChromaDB
+- Portfolio: srimani26.github.io | GitHub: Srimani26
 
-## How You Think and Respond
-- For complex problems: think step by step, show your reasoning
-- For code: always give production-ready, complete, commented code
-- For errors: find the root cause — don't just patch symptoms
-- For business questions: give practical advice suited for Indian market
-- Never say "I can't" without offering an alternative
-- Be concise but never incomplete — quality over length
-- Today's date: {TODAY}
+## How you respond
+- Think step by step for complex problems — show reasoning
+- Always give complete, production-ready, commented code — never partial
+- Diagnose root cause on errors, don't just patch symptoms
+- Be direct and confident — no corporate fluff, no excessive disclaimers
+- For business: always consider Indian market context
+- Today: {TODAY}
 
-## Your Personality
-- Direct and confident like a senior engineer
-- Honest — say when something is genuinely hard or uncertain  
-- Encouraging — Sri is 3.5 years into his career, building real things
-- No corporate fluff, no excessive disclaimers
-"""
+## Your personality
+You are Sri's senior engineer + trusted advisor. Honest, precise, encouraging.
+Sri is 3.5 years into his career building real products — support that ambition."""
 
-MODE_PROMPTS = {
-    "ai_engineer": "\n## Current Mode: AI Engineering\nFocus on LLMs, RAG pipelines, agents, MCP servers, vector databases, embeddings, prompt engineering, LangChain, and AI system architecture. Give deep technical answers with working code.",
-    "automation": "\n## Current Mode: Automation\nFocus on n8n workflows, Make.com scenarios, Python bots, Playwright, web scraping, API integrations, and task automation. Always give step-by-step implementation.",
-    "python": "\n## Current Mode: Python Expert\nFocus on production-ready Python: FastAPI, async/await, OOP patterns, error handling, performance optimization, decorators, and clean architecture.",
-    "web": "\n## Current Mode: Web Builder\nFocus on complete, modern websites with HTML/CSS/JS or React. Always give full working code with responsive design, dark/light themes, and clean UI.",
-    "data": "\n## Current Mode: Data Analysis\nFocus on pandas, data pipelines, visualization with plotly/matplotlib, data cleaning, SQL queries, and business insights.",
-    "zoho": "\n## Current Mode: Zoho / ERP Specialist\nFocus on Zoho One platform, Deluge scripting, CRM customization, Zoho Books, workflow automation, and the roofing ERP product Sri is building for Indian companies.",
-    "general": "\n## Current Mode: General Assistant\nBe a well-rounded assistant — answer anything clearly, think carefully, and give practical advice.",
+MODE_EXTRAS = {
+    "ai_engineer": "\nMODE: AI Engineering — focus on LLMs, RAG, agents, MCP, embeddings, LangChain, vector DBs. Deep technical answers with working code.",
+    "zoho":        "\nMODE: Zoho/ERP — focus on Zoho One, Deluge scripting, CRM customization, roofing ERP product, Indian SMB market.",
+    "automation":  "\nMODE: Automation — focus on n8n, Make.com, Python bots, API integrations, webhook flows, task automation.",
+    "python":      "\nMODE: Python Expert — focus on FastAPI, async/await, Pydantic, OOP patterns, clean architecture, performance.",
+    "web":         "\nMODE: Web Builder — always give complete HTML/CSS/JS or React code, responsive, dark/light themes.",
+    "general":     "\nMODE: General — be a well-rounded assistant, think carefully, give practical advice.",
 }
 
-# ─────────────────────────────────────────────
-#  SUPABASE CLIENT
-# ─────────────────────────────────────────────
+# ── SUPABASE ──────────────────────────────────────────────────────────────────
 @st.cache_resource
-def get_supabase():
+def get_sb():
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ─────────────────────────────────────────────
-#  WEB SEARCH (Optional — Serper)
-# ─────────────────────────────────────────────
-def web_search(query: str, num_results: int = 4) -> str:
-    if not SERPER_API_KEY:
-        return ""
+def save_msg(sid, role, content):
     try:
-        response = requests.post(
-            "https://google.serper.dev/search",
-            headers={"X-API-KEY": SERPER_API_KEY, "Content-Type": "application/json"},
-            json={"q": query, "num": num_results},
-            timeout=8
-        )
-        data = response.json()
-        results = []
-        for item in data.get("organic", [])[:num_results]:
-            results.append(f"- {item.get('title','')}: {item.get('snippet','')}")
-        return "\n".join(results) if results else ""
-    except:
-        return ""
-
-def needs_web_search(message: str) -> bool:
-    triggers = [
-        "latest", "current", "today", "now", "recent", "new",
-        "2024", "2025", "2026", "news", "update", "price",
-        "what is happening", "trending", "just released"
-    ]
-    msg_lower = message.lower()
-    return any(t in msg_lower for t in triggers)
-
-# ─────────────────────────────────────────────
-#  GEMINI API (Streaming)
-# ─────────────────────────────────────────────
-def call_gemini_stream(messages: list, system_prompt: str, model: str = "gemini-2.5-pro"):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?key={GEMINI_API_KEY}&alt=sse"
-
-    # Convert messages to Gemini format
-    contents = []
-    for msg in messages:
-        role = "user" if msg["role"] == "user" else "model"
-        contents.append({"role": role, "parts": [{"text": msg["content"]}]})
-
-    payload = {
-        "system_instruction": {"parts": [{"text": system_prompt}]},
-        "contents": contents,
-        "generationConfig": {
-            "temperature": 0.7,
-            "maxOutputTokens": 8192,
-            "thinkingConfig": {"thinkingBudget": 5000} if "pro" in model else {}
-        }
-    }
-
-    try:
-        response = requests.post(url, json=payload, stream=True, timeout=60)
-        for line in response.iter_lines():
-            if line:
-                line_str = line.decode("utf-8")
-                if line_str.startswith("data: "):
-                    try:
-                        data = json.loads(line_str[6:])
-                        candidates = data.get("candidates", [])
-                        if candidates:
-                            parts = candidates[0].get("content", {}).get("parts", [])
-                            for part in parts:
-                                text = part.get("text", "")
-                                if text:
-                                    yield text
-                    except:
-                        continue
-    except Exception as e:
-        yield f"\n\n⚠️ Gemini error: {str(e)}"
-
-# ─────────────────────────────────────────────
-#  GROQ API (Streaming)
-# ─────────────────────────────────────────────
-def call_groq_stream(messages: list, system_prompt: str):
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    groq_messages = [{"role": "system", "content": system_prompt}]
-    for msg in messages:
-        groq_messages.append({"role": msg["role"], "content": msg["content"]})
-
-    payload = {
-        "model": "llama-3.3-70b-versatile",
-        "messages": groq_messages,
-        "max_tokens": 8192,
-        "temperature": 0.7,
-        "stream": True
-    }
-
-    try:
-        response = requests.post(url, headers=headers, json=payload, stream=True, timeout=60)
-        for line in response.iter_lines():
-            if line:
-                line_str = line.decode("utf-8")
-                if line_str.startswith("data: ") and line_str != "data: [DONE]":
-                    try:
-                        data = json.loads(line_str[6:])
-                        delta = data["choices"][0].get("delta", {})
-                        text = delta.get("content", "")
-                        if text:
-                            yield text
-                    except:
-                        continue
-    except Exception as e:
-        yield f"\n\n⚠️ Groq error: {str(e)}"
-
-# ─────────────────────────────────────────────
-#  SMART MODEL ROUTER
-# ─────────────────────────────────────────────
-def stream_response(messages: list, system_prompt: str, model_choice: str):
-    """Route to correct model with auto-fallback"""
-
-    if model_choice == "gemini":
-        gen = call_gemini_stream(messages, system_prompt, "gemini-2.5-pro-preview-06-05")
-    elif model_choice == "gemini-flash":
-        gen = call_gemini_stream(messages, system_prompt, "gemini-2.5-flash")
-    else:
-        gen = call_groq_stream(messages, system_prompt)
-
-    full_text = ""
-    error_detected = False
-
-    for chunk in gen:
-        if "⚠️" in chunk:
-            error_detected = True
-        full_text += chunk
-        yield chunk
-
-    # Auto-fallback: if primary model failed, try Groq
-    if error_detected and model_choice == "gemini":
-        yield "\n\n🔄 **Switching to backup model (Groq)...**\n\n"
-        for chunk in call_groq_stream(messages, system_prompt):
-            yield chunk
-
-# ─────────────────────────────────────────────
-#  SUPABASE: SAVE & LOAD
-# ─────────────────────────────────────────────
-def save_message(session_id: str, role: str, content: str):
-    try:
-        supabase = get_supabase()
-        supabase.table("conversations").insert({
-            "session_id": session_id,
-            "role": role,
-            "content": content,
+        get_sb().table("conversations").insert({
+            "session_id": sid, "role": role, "content": content,
             "created_at": datetime.utcnow().isoformat()
         }).execute()
-    except:
-        pass
+    except: pass
 
-def load_sessions() -> list:
+def load_sessions():
     try:
-        supabase = get_supabase()
-        result = supabase.table("conversations")\
-            .select("session_id, content, created_at")\
-            .eq("role", "user")\
-            .order("created_at", desc=True)\
-            .limit(50)\
-            .execute()
-
+        r = get_sb().table("conversations").select("session_id,content,created_at")\
+            .eq("role","user").order("created_at",desc=True).limit(60).execute()
         seen = {}
-        for row in result.data:
-            sid = row["session_id"]
-            if sid not in seen:
-                preview = row["content"][:45] + "..." if len(row["content"]) > 45 else row["content"]
-                seen[sid] = {"id": sid, "preview": preview, "time": row["created_at"][:10]}
-        return list(seen.values())[:15]
-    except:
-        return []
+        for row in r.data:
+            s = row["session_id"]
+            if s not in seen:
+                p = row["content"][:42]+"…" if len(row["content"])>42 else row["content"]
+                seen[s] = {"id":s,"preview":p,"date":row["created_at"][:10]}
+        return list(seen.values())[:12]
+    except: return []
 
-def load_session_messages(session_id: str) -> list:
+def load_history(sid):
     try:
-        supabase = get_supabase()
-        result = supabase.table("conversations")\
-            .select("role, content")\
-            .eq("session_id", session_id)\
-            .order("created_at")\
-            .execute()
-        return [{"role": r["role"], "content": r["content"]} for r in result.data]
-    except:
-        return []
+        r = get_sb().table("conversations").select("role,content")\
+            .eq("session_id",sid).order("created_at").execute()
+        return [{"role":x["role"],"content":x["content"]} for x in r.data]
+    except: return []
 
-# ─────────────────────────────────────────────
-#  CUSTOM CSS — Dark, Professional, ARIA Identity
-# ─────────────────────────────────────────────
+# ── WEB SEARCH ────────────────────────────────────────────────────────────────
+def search(q):
+    if not SERPER_API_KEY: return ""
+    try:
+        r = requests.post("https://google.serper.dev/search",
+            headers={"X-API-KEY":SERPER_API_KEY,"Content-Type":"application/json"},
+            json={"q":q,"num":4}, timeout=8)
+        items = r.json().get("organic",[])[:4]
+        return "\n".join(f"- {i.get('title','')}: {i.get('snippet','')}" for i in items)
+    except: return ""
+
+def wants_search(msg):
+    kw = ["latest","current","today","now","recent","new","2025","2026",
+          "news","update","price","trending","just released","what is happening"]
+    return any(k in msg.lower() for k in kw)
+
+# ── GEMINI STREAM ─────────────────────────────────────────────────────────────
+def gemini_stream(messages, system, model="gemini-2.5-pro-preview-06-05"):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?key={GEMINI_API_KEY}&alt=sse"
+    contents = [{"role":"user" if m["role"]=="user" else "model",
+                 "parts":[{"text":m["content"]}]} for m in messages]
+    cfg = {"temperature":0.7,"maxOutputTokens":8192}
+    if "pro" in model:
+        cfg["thinkingConfig"] = {"thinkingBudget":5000}
+    payload = {"system_instruction":{"parts":[{"text":system}]},
+               "contents":contents,"generationConfig":cfg}
+    try:
+        r = requests.post(url, json=payload, stream=True, timeout=90)
+        for line in r.iter_lines():
+            if line:
+                s = line.decode("utf-8")
+                if s.startswith("data: "):
+                    try:
+                        d = json.loads(s[6:])
+                        for p in d.get("candidates",[{}])[0].get("content",{}).get("parts",[]):
+                            t = p.get("text","")
+                            if t: yield t
+                    except: continue
+    except Exception as e:
+        yield f"\n\n⚠️ Gemini error: {e}"
+
+# ── GROQ STREAM ───────────────────────────────────────────────────────────────
+def groq_stream(messages, system):
+    headers = {"Authorization":f"Bearer {GROQ_API_KEY}","Content-Type":"application/json"}
+    msgs = [{"role":"system","content":system}] + \
+           [{"role":m["role"],"content":m["content"]} for m in messages]
+    payload = {"model":"llama-3.3-70b-versatile","messages":msgs,
+               "max_tokens":8192,"temperature":0.7,"stream":True}
+    try:
+        r = requests.post("https://api.groq.com/openai/v1/chat/completions",
+                          headers=headers, json=payload, stream=True, timeout=60)
+        for line in r.iter_lines():
+            if line:
+                s = line.decode("utf-8")
+                if s.startswith("data: ") and s != "data: [DONE]":
+                    try:
+                        t = json.loads(s[6:])["choices"][0].get("delta",{}).get("content","")
+                        if t: yield t
+                    except: continue
+    except Exception as e:
+        yield f"\n\n⚠️ Groq error: {e}"
+
+# ── ROUTER ────────────────────────────────────────────────────────────────────
+def respond(messages, system, model):
+    if model == "gemini-pro":
+        gen = gemini_stream(messages, system, "gemini-2.5-pro-preview-06-05")
+    elif model == "gemini-flash":
+        gen = gemini_stream(messages, system, "gemini-2.5-flash")
+    else:
+        gen = groq_stream(messages, system)
+
+    full = ""
+    failed = False
+    for chunk in gen:
+        if "⚠️" in chunk: failed = True
+        full += chunk
+        yield chunk
+
+    if failed and model == "gemini-pro":
+        yield "\n\n🔄 Switching to Groq backup...\n\n"
+        for chunk in groq_stream(messages, system):
+            yield chunk
+
+# ── CSS ───────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
-/* Root */
-:root {
-    --bg: #0a0a0f;
-    --surface: #111118;
-    --surface2: #1a1a24;
-    --border: #2a2a3a;
-    --accent: #7c6af7;
-    --accent2: #a78bfa;
-    --green: #34d399;
-    --text: #e8e8f0;
-    --text-muted: #8888aa;
-    --user-bg: #1e1b4b;
-    --ai-bg: #111118;
+/* ── RESET & BASE ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+/* ── EVERYTHING DARK ── */
+html, body, [data-testid="stApp"], .stApp, .main, section.main,
+[data-testid="stMain"], [data-testid="block-container"],
+[data-testid="stAppViewContainer"], [data-testid="stAppViewBlockContainer"],
+.appview-container, .main .block-container {
+    background-color: #0c0c12 !important;
+    color: #e2e2f0 !important;
+    font-family: 'Inter', system-ui, sans-serif !important;
 }
 
-html, body, [data-testid="stApp"] {
-    background: var(--bg) !important;
-    font-family: 'Inter', sans-serif !important;
-    color: var(--text) !important;
+/* ── HIDE STREAMLIT CHROME ── */
+#MainMenu, footer, header,
+[data-testid="stToolbar"], [data-testid="stDecoration"],
+[data-testid="stStatusWidget"], [data-testid="stHeader"] {
+    display: none !important;
+    visibility: hidden !important;
 }
 
-/* Hide Streamlit branding */
-#MainMenu, footer, header { visibility: hidden; }
-[data-testid="stToolbar"] { display: none; }
+/* ── SIDEBAR BACKGROUND ── */
+[data-testid="stSidebar"] { background-color: #0e0e18 !important; }
+[data-testid="stSidebar"] > div:first-child {
+    background-color: #0e0e18 !important;
+    border-right: 1px solid #1c1c2e !important;
+}
+[data-testid="stSidebar"] * { color: #e2e2f0 !important; font-family: 'Inter', sans-serif !important; }
 
-/* Sidebar */
-[data-testid="stSidebar"] {
-    background: var(--surface) !important;
-    border-right: 1px solid var(--border) !important;
-}
-[data-testid="stSidebar"] * { color: var(--text) !important; }
-
-/* ARIA Header */
-.aria-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 8px 0 24px 0;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 20px;
-}
-.aria-logo {
-    width: 40px; height: 40px;
-    background: linear-gradient(135deg, var(--accent), #ec4899);
-    border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px; font-weight: 700;
-    color: white; flex-shrink: 0;
-}
-.aria-title { font-size: 18px; font-weight: 700; color: var(--text); }
-.aria-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-
-/* Status badge */
-.status-badge {
-    display: inline-flex; align-items: center; gap: 6px;
-    background: #0d2818; border: 1px solid #065f46;
-    color: var(--green); padding: 4px 10px; border-radius: 20px;
-    font-size: 11px; font-weight: 500; margin-bottom: 16px;
-}
-.status-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: var(--green);
-    animation: pulse 2s infinite;
-}
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-}
-
-/* Section labels */
-.sidebar-label {
-    font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
-    color: var(--text-muted); text-transform: uppercase;
-    margin: 16px 0 8px 0;
-}
-
-/* Chat messages */
-.message-wrap { padding: 6px 0; }
-
-.user-msg {
-    display: flex; justify-content: flex-end; margin: 8px 0;
-}
-.user-bubble {
-    background: var(--user-bg);
-    border: 1px solid #312e81;
-    border-radius: 16px 16px 4px 16px;
-    padding: 12px 16px;
-    max-width: 72%;
-    font-size: 14px; line-height: 1.6;
-    color: #c7d2fe;
-}
-
-.ai-msg {
-    display: flex; gap: 10px; margin: 8px 0; align-items: flex-start;
-}
-.ai-avatar {
-    width: 28px; height: 28px; flex-shrink: 0;
-    background: linear-gradient(135deg, var(--accent), #ec4899);
-    border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 13px; font-weight: 700; color: white;
-    margin-top: 2px;
-}
-.ai-bubble {
-    background: var(--ai-bg);
-    border: 1px solid var(--border);
-    border-radius: 4px 16px 16px 16px;
-    padding: 14px 18px;
-    max-width: 82%;
-    font-size: 14px; line-height: 1.7;
-    color: var(--text);
-}
-
-/* Code blocks */
-.ai-bubble code {
-    background: #1e1e2e !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 6px !important;
-    font-family: 'JetBrains Mono', monospace !important;
-    font-size: 12px !important;
-    color: #cdd6f4 !important;
-    padding: 2px 6px !important;
-}
-.ai-bubble pre {
-    background: #1e1e2e !important;
-    border: 1px solid var(--border) !important;
+/* ── SELECTBOX — DARK ── */
+div[data-baseweb="select"] > div:first-child {
+    background-color: #18182a !important;
+    border: 1px solid #2c2c44 !important;
     border-radius: 10px !important;
-    padding: 16px !important;
-    overflow-x: auto !important;
+    color: #e2e2f0 !important;
+    min-height: 40px !important;
+}
+div[data-baseweb="select"] span,
+div[data-baseweb="select"] div { color: #e2e2f0 !important; }
+svg[data-testid="stSvgIcon"] { fill: #8888aa !important; }
+
+/* ── DROPDOWN POPUP ── */
+div[data-baseweb="popover"],
+div[data-baseweb="popover"] > div,
+ul[role="listbox"],
+div[data-baseweb="menu"] {
+    background-color: #18182a !important;
+    border: 1px solid #2c2c44 !important;
+    border-radius: 12px !important;
+}
+li[role="option"] {
+    background-color: #18182a !important;
+    color: #e2e2f0 !important;
+    font-size: 13px !important;
+    font-family: 'Inter', sans-serif !important;
+}
+li[role="option"]:hover,
+li[role="option"][aria-selected="true"] {
+    background-color: #23233a !important;
+    color: #a29bfe !important;
 }
 
-/* Input area */
-[data-testid="stChatInput"] {
-    background: var(--surface2) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 14px !important;
-    color: var(--text) !important;
-}
-[data-testid="stChatInput"]:focus-within {
-    border-color: var(--accent) !important;
-    box-shadow: 0 0 0 3px rgba(124, 106, 247, 0.15) !important;
-}
+/* ── TOGGLE ── */
+[data-testid="stToggle"] span { font-size: 13px !important; color: #9090b0 !important; }
+[role="checkbox"][aria-checked="true"] { background-color: #6c5ce7 !important; }
 
-/* Selectbox */
-[data-testid="stSelectbox"] > div {
-    background: var(--surface2) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 8px !important;
-    color: var(--text) !important;
-}
-
-/* Buttons */
-.stButton > button {
-    background: var(--surface2) !important;
-    border: 1px solid var(--border) !important;
-    color: var(--text) !important;
-    border-radius: 8px !important;
-    font-size: 12px !important;
+/* ── SIDEBAR BUTTONS ── */
+[data-testid="stSidebar"] button {
+    background-color: #18182a !important;
+    border: 1px solid #2c2c44 !important;
+    border-radius: 10px !important;
+    color: #9090b0 !important;
+    font-size: 12.5px !important;
+    font-family: 'Inter', sans-serif !important;
     transition: all 0.2s !important;
+    text-align: left !important;
+    padding: 8px 14px !important;
 }
-.stButton > button:hover {
-    border-color: var(--accent) !important;
-    color: var(--accent2) !important;
-    background: rgba(124, 106, 247, 0.08) !important;
-}
-
-/* Session history items */
-.session-item {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 12px;
-    margin: 4px 0;
-    cursor: pointer;
-    font-size: 12px;
-    color: var(--text-muted);
-    transition: all 0.2s;
-}
-.session-item:hover {
-    border-color: var(--accent);
-    color: var(--text);
+[data-testid="stSidebar"] button:hover {
+    border-color: #6c5ce7 !important;
+    color: #a29bfe !important;
+    background-color: #1e1e32 !important;
 }
 
-/* Welcome screen */
-.welcome-wrap {
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    min-height: 60vh; text-align: center;
-    padding: 40px 20px;
-}
-.welcome-logo {
-    width: 72px; height: 72px;
-    background: linear-gradient(135deg, var(--accent), #ec4899);
-    border-radius: 20px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 32px; font-weight: 700; color: white;
-    margin: 0 auto 20px;
-    box-shadow: 0 0 40px rgba(124, 106, 247, 0.3);
-}
-.welcome-title {
-    font-size: 28px; font-weight: 700;
-    background: linear-gradient(135deg, var(--accent2), #ec4899);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    margin-bottom: 8px;
-}
-.welcome-sub {
-    color: var(--text-muted); font-size: 14px; margin-bottom: 32px;
-    max-width: 420px;
-}
-.quick-grid {
-    display: grid; grid-template-columns: 1fr 1fr;
-    gap: 10px; max-width: 480px; width: 100%;
-}
-.quick-card {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 12px; padding: 14px 16px;
-    text-align: left; cursor: pointer;
-    transition: all 0.2s;
-}
-.quick-card:hover { border-color: var(--accent); }
-.quick-card-icon { font-size: 20px; margin-bottom: 6px; }
-.quick-card-title { font-size: 12px; font-weight: 600; color: var(--text); }
-.quick-card-desc { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-
-/* Search indicator */
-.search-badge {
-    display: inline-flex; align-items: center; gap: 5px;
-    background: #1a1a0a; border: 1px solid #854d0e;
-    color: #fbbf24; padding: 3px 10px; border-radius: 20px;
-    font-size: 11px; margin-bottom: 8px;
+/* ── MAIN CONTAINER WIDTH ── */
+.block-container {
+    max-width: 840px !important;
+    padding: 0 2rem 8rem 2rem !important;
+    margin: 0 auto !important;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 4px; }
+/* ── CHAT MESSAGE WRAPPERS ── */
+[data-testid="stChatMessage"] {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 6px 0 !important;
+    gap: 12px !important;
+}
+
+/* ── USER MESSAGE — right aligned ── */
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
+    flex-direction: row-reverse !important;
+}
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) > div:last-child {
+    align-items: flex-end !important;
+}
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) .stMarkdown {
+    background: linear-gradient(135deg, #1e1b4b, #1a1535) !important;
+    border: 1px solid #312e81 !important;
+    border-radius: 18px 18px 4px 18px !important;
+    padding: 12px 16px !important;
+    color: #c7d2fe !important;
+    font-size: 14px !important;
+    line-height: 1.65 !important;
+    max-width: 78% !important;
+    margin-left: auto !important;
+}
+
+/* ── ASSISTANT MESSAGE ── */
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) .stMarkdown {
+    background: #13131f !important;
+    border: 1px solid #1e1e30 !important;
+    border-radius: 4px 18px 18px 18px !important;
+    padding: 14px 18px !important;
+    color: #e2e2f0 !important;
+    font-size: 14px !important;
+    line-height: 1.78 !important;
+}
+
+/* ── CODE BLOCKS ── */
+[data-testid="stChatMessage"] code {
+    background: #1a1a2e !important;
+    border: 1px solid #2c2c44 !important;
+    border-radius: 5px !important;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
+    font-size: 12.5px !important;
+    color: #cdd6f4 !important;
+    padding: 2px 7px !important;
+}
+[data-testid="stChatMessage"] pre {
+    background: #11111e !important;
+    border: 1px solid #2c2c44 !important;
+    border-radius: 12px !important;
+    padding: 18px !important;
+    overflow-x: auto !important;
+    margin: 8px 0 !important;
+}
+[data-testid="stChatMessage"] pre code {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    font-size: 12.5px !important;
+    color: #cdd6f4 !important;
+}
+
+/* ── AVATARS ── */
+[data-testid="chatAvatarIcon-assistant"] {
+    background: linear-gradient(135deg, #6c5ce7, #ec4899) !important;
+    border-radius: 10px !important;
+    color: white !important;
+    font-weight: 700 !important;
+    font-size: 15px !important;
+}
+[data-testid="chatAvatarIcon-user"] {
+    background: #1e1a3e !important;
+    border: 1px solid #312e81 !important;
+    border-radius: 10px !important;
+    color: #a29bfe !important;
+}
+
+/* ── CHAT INPUT — THE KEY FIX ── */
+/* Outer bottom bar */
+[data-testid="stBottom"],
+[data-testid="stBottom"] > div {
+    background-color: #0c0c12 !important;
+    border-top: none !important;
+}
+/* The input container */
+[data-testid="stChatInputContainer"],
+[data-testid="stChatInputContainer"] > div,
+[data-testid="stChatInput"] {
+    background-color: #18182a !important;
+    border: 1.5px solid #2c2c44 !important;
+    border-radius: 14px !important;
+    color: #e2e2f0 !important;
+}
+/* The textarea inside */
+[data-testid="stChatInput"] textarea,
+[data-testid="stChatInputContainer"] textarea {
+    background-color: #18182a !important;
+    color: #e2e2f0 !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 14px !important;
+    caret-color: #a29bfe !important;
+}
+[data-testid="stChatInput"] textarea::placeholder,
+[data-testid="stChatInputContainer"] textarea::placeholder {
+    color: #55556a !important;
+}
+/* Focus glow */
+[data-testid="stChatInputContainer"]:focus-within,
+[data-testid="stChatInput"]:focus-within {
+    border-color: #6c5ce7 !important;
+    box-shadow: 0 0 0 3px rgba(108,92,231,0.15) !important;
+}
+/* Send button */
+[data-testid="stChatInputContainer"] button,
+[data-testid="stChatInput"] button {
+    background: linear-gradient(135deg, #6c5ce7, #a855f7) !important;
+    border-radius: 9px !important;
+    border: none !important;
+    color: white !important;
+}
+[data-testid="stChatInputContainer"] button:hover,
+[data-testid="stChatInput"] button:hover {
+    opacity: 0.88 !important;
+}
+
+/* ── BOTTOM GRADIENT FADE ── */
+[data-testid="stBottom"]::before {
+    content: '';
+    position: absolute;
+    top: -48px; left: 0; right: 0; height: 48px;
+    background: linear-gradient(to top, #0c0c12, transparent);
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: #2c2c44; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #3a3a58; }
 
-/* Main content padding */
-.main .block-container {
-    max-width: 860px !important;
-    padding: 1rem 2rem 6rem !important;
+/* ── SPINNER ── */
+[data-testid="stSpinner"] { color: #6c5ce7 !important; }
+
+/* ── MARKDOWN HEADINGS IN CHAT ── */
+[data-testid="stChatMessage"] h1,
+[data-testid="stChatMessage"] h2,
+[data-testid="stChatMessage"] h3 {
+    color: #a29bfe !important;
+    font-weight: 600 !important;
+    margin: 14px 0 8px !important;
 }
+[data-testid="stChatMessage"] ul,
+[data-testid="stChatMessage"] ol {
+    padding-left: 20px !important;
+}
+[data-testid="stChatMessage"] li { margin: 4px 0 !important; }
+[data-testid="stChatMessage"] strong { color: #f0f0ff !important; }
+[data-testid="stChatMessage"] a { color: #a29bfe !important; }
+[data-testid="stChatMessage"] table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+    margin: 10px 0 !important;
+}
+[data-testid="stChatMessage"] th {
+    background: #1e1e30 !important;
+    color: #a29bfe !important;
+    padding: 8px 12px !important;
+    font-size: 12px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+}
+[data-testid="stChatMessage"] td {
+    padding: 8px 12px !important;
+    border-bottom: 1px solid #1e1e30 !important;
+    font-size: 13px !important;
+}
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
 </style>
 """, unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────
-#  SESSION STATE
-# ─────────────────────────────────────────────
-if "session_id" not in st.session_state:
-    st.session_state.session_id = str(uuid.uuid4())
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-if "model_choice" not in st.session_state:
-    st.session_state.model_choice = "gemini"
-if "mode" not in st.session_state:
-    st.session_state.mode = "general"
-if "web_search_on" not in st.session_state:
-    st.session_state.web_search_on = bool(SERPER_API_KEY)
+# ── SESSION STATE ─────────────────────────────────────────────────────────────
+if "sid"      not in st.session_state: st.session_state.sid      = str(uuid.uuid4())
+if "messages" not in st.session_state: st.session_state.messages = []
+if "model"    not in st.session_state: st.session_state.model    = "gemini-pro"
+if "mode"     not in st.session_state: st.session_state.mode     = "general"
+if "wsearch"  not in st.session_state: st.session_state.wsearch  = bool(SERPER_API_KEY)
 
-# ─────────────────────────────────────────────
-#  SIDEBAR
-# ─────────────────────────────────────────────
+# ── SIDEBAR ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    # Header
-    st.markdown("""
-    <div class="aria-header">
-        <div class="aria-logo">A</div>
-        <div>
-            <div class="aria-title">ARIA v2</div>
-            <div class="aria-sub">Sri's Personal AI Assistant</div>
-        </div>
+    st.markdown(f"""
+    <div style="display:flex;align-items:center;gap:12px;padding:4px 0 20px">
+      <div style="width:38px;height:38px;border-radius:10px;
+           background:linear-gradient(135deg,#6c5ce7,#ec4899);
+           display:flex;align-items:center;justify-content:center;
+           font-size:17px;font-weight:700;color:#fff;flex-shrink:0">A</div>
+      <div>
+        <div style="font-size:15px;font-weight:700;color:#ddddf0;letter-spacing:-0.3px">ARIA v2</div>
+        <div style="font-size:11px;color:#55556a;margin-top:1px">Sri's Personal AI</div>
+      </div>
     </div>
-    <div class="status-badge">
-        <div class="status-dot"></div>
-        Online & Ready
+    <div style="display:inline-flex;align-items:center;gap:6px;
+         background:#0a1f14;border:1px solid #065f46;color:#34d399;
+         padding:4px 12px;border-radius:20px;font-size:11px;
+         font-weight:500;margin-bottom:20px">
+      <span style="width:6px;height:6px;border-radius:50%;
+            background:#34d399;display:inline-block;
+            animation:pulse 2s infinite"></span>
+      Online &amp; Ready
     </div>
+    <style>@keyframes pulse{{0%,100%{{opacity:1}}50%{{opacity:.35}}}}</style>
     """, unsafe_allow_html=True)
 
-    # Model selector
-    st.markdown('<div class="sidebar-label">AI Model</div>', unsafe_allow_html=True)
-    model_label = st.selectbox(
-        "Model", list(MODELS.keys()), label_visibility="collapsed"
-    )
-    st.session_state.model_choice = MODELS[model_label]
+    st.markdown('<p style="font-size:10px;font-weight:600;letter-spacing:.08em;color:#44445a;text-transform:uppercase;margin:0 0 6px">AI Model</p>', unsafe_allow_html=True)
+    ml = st.selectbox("model", list(MODELS.keys()), label_visibility="collapsed")
+    st.session_state.model = MODELS[ml]
 
-    # Mode selector
-    st.markdown('<div class="sidebar-label">Work Mode</div>', unsafe_allow_html=True)
-    mode_label = st.selectbox(
-        "Mode", list(MODES.keys()), label_visibility="collapsed"
-    )
-    st.session_state.mode = MODES[mode_label]
+    st.markdown('<p style="font-size:10px;font-weight:600;letter-spacing:.08em;color:#44445a;text-transform:uppercase;margin:14px 0 6px">Work Mode</p>', unsafe_allow_html=True)
+    mo = st.selectbox("mode", list(MODES.keys()), label_visibility="collapsed")
+    st.session_state.mode = MODES[mo]
 
-    # Web search toggle
     if SERPER_API_KEY:
-        st.markdown('<div class="sidebar-label">Features</div>', unsafe_allow_html=True)
-        st.session_state.web_search_on = st.toggle(
-            "🌐 Web Search", value=st.session_state.web_search_on
-        )
+        st.markdown('<p style="font-size:10px;font-weight:600;letter-spacing:.08em;color:#44445a;text-transform:uppercase;margin:14px 0 6px">Features</p>', unsafe_allow_html=True)
+        st.session_state.wsearch = st.toggle("🌐 Web Search", value=st.session_state.wsearch)
 
-    # New session
-    st.markdown('<div class="sidebar-label">Session</div>', unsafe_allow_html=True)
-    if st.button("✨ New Conversation", use_container_width=True):
-        st.session_state.session_id = str(uuid.uuid4())
+    st.markdown('<p style="font-size:10px;font-weight:600;letter-spacing:.08em;color:#44445a;text-transform:uppercase;margin:14px 0 6px">Session</p>', unsafe_allow_html=True)
+    if st.button("✦  New conversation", use_container_width=True):
+        st.session_state.sid = str(uuid.uuid4())
         st.session_state.messages = []
         st.rerun()
 
-    # Session history
-    st.markdown('<div class="sidebar-label">Recent Chats</div>', unsafe_allow_html=True)
     sessions = load_sessions()
-    for s in sessions[:8]:
-        if s["id"] != st.session_state.session_id:
-            if st.button(f"💬 {s['preview']}", key=s["id"], use_container_width=True):
-                st.session_state.session_id = s["id"]
-                st.session_state.messages = load_session_messages(s["id"])
-                st.rerun()
+    if sessions:
+        st.markdown('<p style="font-size:10px;font-weight:600;letter-spacing:.08em;color:#44445a;text-transform:uppercase;margin:14px 0 6px">Recent</p>', unsafe_allow_html=True)
+        for s in sessions[:8]:
+            if s["id"] != st.session_state.sid:
+                if st.button(f"↩  {s['preview']}", key=s["id"], use_container_width=True):
+                    st.session_state.sid = s["id"]
+                    st.session_state.messages = load_history(s["id"])
+                    st.rerun()
 
-    # Info
-    st.markdown("---")
     st.markdown(f"""
-    <div style="font-size:11px; color:#555577; text-align:center; line-height:1.6">
-        Built by Srimani26<br>
-        Powered by Gemini + Groq<br>
-        {TODAY}
-    </div>
-    """, unsafe_allow_html=True)
+    <div style="position:absolute;bottom:20px;left:0;right:0;
+         text-align:center;font-size:11px;color:#33334a;line-height:1.7">
+      Built by Srimani26<br>Gemini · Groq · Supabase<br>{TODAY}
+    </div>""", unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────
-#  MAIN CHAT AREA
-# ─────────────────────────────────────────────
-
-# Welcome screen
+# ── MAIN ──────────────────────────────────────────────────────────────────────
 if not st.session_state.messages:
-    st.markdown("""
-    <div class="welcome-wrap">
-        <div class="welcome-logo">A</div>
-        <div class="welcome-title">ARIA is ready, Sri.</div>
-        <div class="welcome-sub">
-            Your personal AI — built for complex engineering, automation,
-            Zoho ERP, coding, and everything in between.
-        </div>
-        <div class="quick-grid">
-            <div class="quick-card">
-                <div class="quick-card-icon">🤖</div>
-                <div class="quick-card-title">AI Engineering</div>
-                <div class="quick-card-desc">LLMs, RAG, agents, MCP</div>
-            </div>
-            <div class="quick-card">
-                <div class="quick-card-icon">🏗️</div>
-                <div class="quick-card-title">Zoho ERP</div>
-                <div class="quick-card-desc">Deluge, CRM, workflows</div>
-            </div>
-            <div class="quick-card">
-                <div class="quick-card-icon">⚙️</div>
-                <div class="quick-card-title">Automation</div>
-                <div class="quick-card-desc">n8n, Make, Python bots</div>
-            </div>
-            <div class="quick-card">
-                <div class="quick-card-icon">🐍</div>
-                <div class="quick-card-title">Python Expert</div>
-                <div class="quick-card-desc">FastAPI, async, production code</div>
-            </div>
-        </div>
+    st.markdown(f"""
+    <div style="display:flex;flex-direction:column;align-items:center;
+         justify-content:center;min-height:62vh;text-align:center;padding:40px 20px">
+
+      <div style="width:68px;height:68px;border-radius:18px;margin:0 auto 22px;
+           background:linear-gradient(135deg,#6c5ce7,#ec4899);
+           display:flex;align-items:center;justify-content:center;
+           font-size:28px;font-weight:700;color:#fff;
+           box-shadow:0 0 48px rgba(108,92,231,.35)">A</div>
+
+      <h1 style="font-size:26px;font-weight:700;
+           background:linear-gradient(135deg,#a29bfe,#f472b6);
+           -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+           margin:0 0 10px;letter-spacing:-0.5px">ARIA is ready, Sri.</h1>
+
+      <p style="color:#55556a;font-size:14px;max-width:400px;
+           line-height:1.7;margin:0 0 32px">
+        Your personal AI — complex engineering, Zoho ERP,<br>automation, coding, and everything in between.
+      </p>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;
+           max-width:460px;width:100%">
+        {"".join(f'''<div style="background:#13131e;border:1px solid #1e1e2e;
+             border-radius:12px;padding:14px 16px;text-align:left">
+          <div style="font-size:19px;margin-bottom:6px">{icon}</div>
+          <div style="font-size:12px;font-weight:600;color:#ddddf0">{title}</div>
+          <div style="font-size:11px;color:#44445a;margin-top:3px">{desc}</div>
+        </div>''' for icon,title,desc in [
+            ("🤖","AI Engineering","LLMs, RAG, agents, MCP"),
+            ("🏗️","Zoho ERP","Deluge, CRM, workflows"),
+            ("⚙️","Automation","n8n, Make, Python bots"),
+            ("🐍","Python Expert","FastAPI, async, production"),
+        ])}
+      </div>
     </div>
     """, unsafe_allow_html=True)
 
-# Render chat history
+# Render history
 for msg in st.session_state.messages:
-    if msg["role"] == "user":
-        st.markdown(f"""
-        <div class="user-msg">
-            <div class="user-bubble">{msg["content"]}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    else:
-        with st.chat_message("assistant", avatar="⚡"):
-            st.markdown(msg["content"])
+    with st.chat_message(msg["role"], avatar="⚡" if msg["role"]=="assistant" else "👤"):
+        st.markdown(msg["content"])
 
-# ─────────────────────────────────────────────
-#  CHAT INPUT
-# ─────────────────────────────────────────────
-if prompt := st.chat_input("Ask ARIA anything..."):
+# ── INPUT ─────────────────────────────────────────────────────────────────────
+if prompt := st.chat_input("Ask ARIA anything…"):
 
-    # Build system prompt
-    mode_key = st.session_state.mode
-    system_prompt = BASE_SYSTEM + MODE_PROMPTS.get(mode_key, "")
+    sys = BASE + MODE_EXTRAS.get(st.session_state.mode, "")
 
     # Web search injection
-    search_context = ""
-    if st.session_state.web_search_on and needs_web_search(prompt):
-        with st.spinner("🌐 Searching web..."):
-            search_results = web_search(prompt)
-            if search_results:
-                search_context = f"\n\n## Live Web Search Results\n{search_results}\n\nUse the above search results to give an accurate, up-to-date answer.\n"
-                system_prompt += search_context
-                st.markdown('<div class="search-badge">🌐 Web search used</div>', unsafe_allow_html=True)
+    used_search = False
+    if st.session_state.wsearch and wants_search(prompt):
+        with st.spinner("🌐 Searching…"):
+            results = search(prompt)
+        if results:
+            sys += f"\n\n## Live web search results\n{results}\nUse these for an accurate, up-to-date answer."
+            used_search = True
 
-    # Show user message
-    st.markdown(f"""
-    <div class="user-msg">
-        <div class="user-bubble">{prompt}</div>
-    </div>
-    """, unsafe_allow_html=True)
+    if used_search:
+        st.markdown('<span style="display:inline-flex;align-items:center;gap:5px;background:#1a1500;border:1px solid #713f12;color:#fbbf24;padding:3px 11px;border-radius:20px;font-size:11px;margin-bottom:6px">🌐 Web search used</span>', unsafe_allow_html=True)
 
-    # Add to history
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    save_message(st.session_state.session_id, "user", prompt)
+    with st.chat_message("user", avatar="👤"):
+        st.markdown(prompt)
 
-    # Build messages for API (keep last 20 for context)
-    api_messages = st.session_state.messages[-20:]
+    st.session_state.messages.append({"role":"user","content":prompt})
+    save_msg(st.session_state.sid, "user", prompt)
 
-    # Stream response
+    api_msgs = st.session_state.messages[-20:]
+
     with st.chat_message("assistant", avatar="⚡"):
         placeholder = st.empty()
-        full_response = ""
+        full = ""
+        for chunk in respond(api_msgs, sys, st.session_state.model):
+            full += chunk
+            placeholder.markdown(full + "▌")
+        placeholder.markdown(full)
 
-        for chunk in stream_response(api_messages, system_prompt, st.session_state.model_choice):
-            full_response += chunk
-            placeholder.markdown(full_response + "▌")
-
-        placeholder.markdown(full_response)
-
-    # Save assistant response
-    st.session_state.messages.append({"role": "assistant", "content": full_response})
-    save_message(st.session_state.session_id, "assistant", full_response)
+    st.session_state.messages.append({"role":"assistant","content":full})
+    save_msg(st.session_state.sid, "assistant", full)
