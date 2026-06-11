@@ -320,22 +320,30 @@ def gemini_stream(messages, system, model_id="gemini-2.5-pro", img_b64=None, img
     payload = {"system_instruction": {"parts": [{"text": system}]},
                "contents": contents, "generationConfig": cfg}
     try:
-        r = requests.post(url, json=payload, stream=True, timeout=90)
-        if r.status_code != 200:
-         yield f"\n\nGemini API Error {r.status_code}\n{r.text}"
+    r = requests.post(url, json=payload, stream=True, timeout=90)
+
+    if r.status_code != 200:
+        yield f"\n\nGemini API Error {r.status_code}\n{r.text}"
         return
 
-        for line in r.iter_lines():
-            if line:
-                s = line.decode("utf-8")
-                if s.startswith("data: "):
-                    try:
-                        d = json.loads(s[6:])
-                        for part in d.get("candidates", [{}])[0].get("content", {}).get("parts", []):
-                            t = part.get("text", "")
-                            if t: yield t
-                    except Exception as e:
-    yield f"\n\nGemini Parse Error: {str(e)}"
+    for line in r.iter_lines():
+        if line:
+            s = line.decode("utf-8")
+
+            if s.startswith("data: "):
+                try:
+                    d = json.loads(s[6:])
+
+                    for part in d.get("candidates", [{}])[0].get("content", {}).get("parts", []):
+                        t = part.get("text", "")
+                        if t:
+                            yield t
+
+                except Exception as e:
+                    yield f"\n\nGemini Parse Error: {str(e)}"
+
+except Exception as e:
+    yield f"\n\n⚠️ Gemini error: {e}"
     except Exception as e:
         yield f"\n\n⚠️ Gemini error: {e}"
 
