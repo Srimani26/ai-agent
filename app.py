@@ -2,7 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 import io
-
+from services.pdf_reader import extract_pdf_text
 # ---------------------------------------------------
 # PAGE CONFIG
 # ---------------------------------------------------
