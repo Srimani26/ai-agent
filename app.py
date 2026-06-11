@@ -58,14 +58,14 @@ You are Sri's (Srimani26) exclusive personal AI. Sri is an AI Engineer & Automat
 - Diagnose root cause — don't just patch symptoms
 - Direct, confident, no fluff. Today: {TODAY}"""
 
-MODE_EXTRAS = {{
+MODE_EXTRAS = {
     "ai_engineer": "\nMODE: AI Engineering — LLMs, RAG, agents, MCP, embeddings, LangChain, vector DBs.",
     "zoho":        "\nMODE: Zoho/ERP — Zoho One, Deluge scripting, CRM customization, roofing ERP.",
     "automation":  "\nMODE: Automation — n8n, Make.com, Python bots, API integrations.",
     "python":      "\nMODE: Python Expert — FastAPI, async/await, Pydantic, OOP.",
     "web":         "\nMODE: Web Builder — complete HTML/CSS/JS or React, responsive.",
     "general":     "\nMODE: General assistant.",
-}}
+}
 
 # ── CSS ────────────────────────────────────────────────────────────────────────
 st.markdown("""
