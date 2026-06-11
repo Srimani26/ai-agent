@@ -1,6 +1,6 @@
 streamlit>=1.35.0
 requests>=2.31.0
 supabase>=2.4.0
-google-generativeai
-pillow
-pypdf
+google-generativeai>=0.8.0
+pillow>=10.0.0
+pypdf>=4.0.0
