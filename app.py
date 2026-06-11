@@ -103,8 +103,8 @@ for msg in st.session_state.messages:
 # ---------------------------------------------------
 
 uploaded_file = st.file_uploader(
-    "Attach image (optional)",
-    type=["png","jpg","jpeg","webp"]
+    "Attach File",
+    type=["png","jpg","jpeg","webp","pdf"]
 )
 
 image = None
