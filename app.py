@@ -216,6 +216,77 @@ li[role="option"]:hover, li[aria-selected="true"] {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #22223a; border-radius: 3px; }
 
+/* ── CHAT MESSAGES — override st.chat_message ── */
+/* User message bubble */
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
+    flex-direction: row-reverse !important;
+    background: transparent !important;
+    border: none !important;
+    padding: 4px 0 !important;
+}
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) [data-testid="chatAvatarIcon-user"] {
+    display: none !important;
+}
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) .stMarkdown {
+    background: linear-gradient(135deg, #1c1840, #201d52) !important;
+    border: 1px solid #2d2870 !important;
+    border-radius: 18px 18px 4px 18px !important;
+    padding: 11px 16px !important;
+    color: #cdd2fe !important;
+    font-size: 14px !important;
+    line-height: 1.65 !important;
+    max-width: 78% !important;
+    margin-left: auto !important;
+}
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) .stMarkdown p {
+    color: #cdd2fe !important;
+    margin: 0 !important;
+}
+/* ARIA assistant message */
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) {
+    background: transparent !important;
+    border: none !important;
+    padding: 4px 0 !important;
+    align-items: flex-start !important;
+}
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) [data-testid="chatAvatarIcon-assistant"] {
+    background: linear-gradient(135deg, #7c6ef7, #ec4899) !important;
+    border-radius: 9px !important;
+    color: white !important;
+    font-weight: 800 !important;
+    font-size: 13px !important;
+    width: 30px !important;
+    height: 30px !important;
+    min-width: 30px !important;
+    border: none !important;
+}
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) .stMarkdown p,
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) .stMarkdown li,
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) .stMarkdown td {
+    color: #ddddf0 !important;
+    font-size: 14px !important;
+    line-height: 1.78 !important;
+}
+/* Code blocks in responses */
+[data-testid="stChatMessage"] code {
+    background: #0d0d20 !important;
+    color: #a89bff !important;
+    border-radius: 4px !important;
+    padding: 1px 5px !important;
+    font-size: 13px !important;
+}
+[data-testid="stChatMessage"] pre {
+    background: #0a0a1a !important;
+    border: 1px solid #1a1a30 !important;
+    border-radius: 10px !important;
+    padding: 14px !important;
+}
+[data-testid="stChatMessage"] pre code {
+    background: transparent !important;
+    padding: 0 !important;
+    color: #c8c8f0 !important;
+}
+
 /* ── ANIMATIONS ── */
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
 @keyframes fadein { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:none} }
@@ -510,30 +581,6 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
 # ── MAIN CHAT ──────────────────────────────────────────────────────────────────
-import html as hl
-
-def user_bubble(content, has_file=False):
-    file_tag = '<span style="display:inline-flex;align-items:center;gap:4px;background:#1a1a38;border:1px solid #2a2a4a;border-radius:6px;padding:2px 8px;font-size:11px;color:#7070b0;margin-bottom:6px;display:block;width:fit-content">📎 File attached</span>' if has_file else ""
-    st.markdown(f"""
-    <div style="display:flex;justify-content:flex-end;margin:14px 0 6px;animation:fadein 0.2s ease">
-      <div style="max-width:78%;min-width:60px">
-        {file_tag}
-        <div style="background:linear-gradient(135deg,#1c1840,#201d52);
-             border:1px solid #2d2870;border-radius:18px 18px 4px 18px;
-             padding:12px 16px;color:#cdd2fe;font-size:14px;line-height:1.65;word-break:break-word">
-          {hl.escape(content)}
-        </div>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-def aria_avatar():
-    st.markdown("""
-    <div style="width:30px;height:30px;border-radius:9px;margin-top:2px;flex-shrink:0;
-         background:linear-gradient(135deg,#7c6ef7,#ec4899);
-         display:flex;align-items:center;justify-content:center;
-         font-size:13px;font-weight:800;color:#fff">A</div>
-    """, unsafe_allow_html=True)
 
 # ── WELCOME SCREEN ─────────────────────────────────────────────────────────────
 if not st.session_state.messages:
@@ -577,12 +624,12 @@ if not st.session_state.messages:
 
 # ── RENDER HISTORY ─────────────────────────────────────────────────────────────
 for msg in st.session_state.messages:
-    if msg["role"] == "user":
-        user_bubble(msg["content"])
-    else:
-        c1, c2 = st.columns([0.055, 0.945])
-        with c1: aria_avatar()
-        with c2: st.markdown(msg["content"])
+    with st.chat_message(msg["role"], avatar="A" if msg["role"] == "assistant" else None):
+        if msg["role"] == "user" and msg["content"].startswith("📎"):
+            # message has file tag prefix
+            st.markdown(msg["content"])
+        else:
+            st.markdown(msg["content"])
 
 # ── FILE UPLOAD ────────────────────────────────────────────────────────────────
 # Inject CSS to fully dark-theme the file uploader widget
@@ -693,20 +740,20 @@ if prompt := st.chat_input("Ask ARIA anything…"):
             used_search = True
 
     if used_search:
-        st.markdown('<div style="margin:4px 0 10px;display:inline-flex;align-items:center;gap:5px;background:#140e00;border:1px solid #5c3300;color:#f59e0b;padding:3px 12px;border-radius:20px;font-size:11px">🌐 Web searched</div>', unsafe_allow_html=True)
+        st.toast("🌐 Web search used", icon="🔍")
 
-    # Render user bubble
-    user_bubble(prompt, has_file=has_file)
-    st.session_state.messages.append({"role": "user", "content": prompt})
+    # Show user message
+    user_display = ("📎 *File attached* — " if has_file else "") + prompt
+    with st.chat_message("user"):
+        st.markdown(user_display)
+    st.session_state.messages.append({"role": "user", "content": user_display})
     save_msg(st.session_state.sid, "user", prompt)
 
     # Reset sessions cache so sidebar refreshes
     st.session_state.sessions = None
 
-    # Render ARIA response
-    c1, c2 = st.columns([0.055, 0.945])
-    with c1: aria_avatar()
-    with c2:
+    # Stream ARIA response
+    with st.chat_message("assistant", avatar="A"):
         placeholder = st.empty()
         full = ""
         api_msgs = st.session_state.messages[-22:]
