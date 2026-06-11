@@ -25,13 +25,15 @@ def get_model(system_prompt: str):
 
 @st.cache_resource
 def get_sb():
+    url = st.secrets.get("SUPABASE_URL", "").strip()
+    key = st.secrets.get("SUPABASE_KEY", "").strip()
+    if not url or not key or not url.startswith("http"):
+        st.session_state["_sb_error"] = f"Missing/invalid config. URL set: {bool(url)}, Key set: {bool(key)}, URL starts with http: {url.startswith('http') if url else False}"
+        return None
     try:
-        url = st.secrets.get("SUPABASE_URL", "").strip()
-        key = st.secrets.get("SUPABASE_KEY", "").strip()
-        if not url or not key or not url.startswith("http"):
-            return None
         return create_client(url, key)
-    except Exception:
+    except Exception as e:
+        st.session_state["_sb_error"] = f"create_client failed: {e}"
         return None
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
@@ -307,6 +309,8 @@ with st.sidebar:
     else:
         st.markdown("---")
         st.caption("🧠 Memory needs Supabase keys in Secrets to work. Chat still works fine without it.")
+        if "_sb_error" in st.session_state:
+            st.code(st.session_state["_sb_error"], language=None)
 
 # ── MAIN ──────────────────────────────────────────────────────────────────────
 if not st.session_state.messages:
