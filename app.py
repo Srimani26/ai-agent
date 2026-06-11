@@ -303,49 +303,69 @@ def auto_route(prompt):
     return "gemini-pro"
 
 # ── MODEL CALLS ────────────────────────────────────────────────────────────────
-def gemini_stream(messages, system, model_id="gemini-2.5-pro", img_b64=None, img_mime=None):
+def gemini_stream(messages, system, model_id="gemini-2.5-flash", img_b64=None, img_mime=None):
+
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:streamGenerateContent?key={GEMINI_API_KEY}&alt=sse"
+
     contents = []
-    for m in messages[:-1]:
-        contents.append({"role": "user" if m["role"] == "user" else "model",
-                         "parts": [{"text": m["content"]}]})
-    last_parts = []
-    if img_b64 and img_mime:
-        last_parts.append({"inline_data": {"mime_type": img_mime, "data": img_b64}})
-    last_parts.append({"text": messages[-1]["content"]})
-    contents.append({"role": "user", "parts": last_parts})
-    cfg = {"temperature": 0.7, "maxOutputTokens": 8192}
-    if "pro" in model_id:
-        cfg["thinkingConfig"] = {"thinkingBudget": 4000}
-    payload = {"system_instruction": {"parts": [{"text": system}]},
-               "contents": contents, "generationConfig": cfg}
+
+    for m in messages:
+        role = "user" if m["role"] == "user" else "model"
+        contents.append({
+            "role": role,
+            "parts": [{"text": m["content"]}]
+        })
+
+    payload = {
+        "system_instruction": {
+            "parts": [{"text": system}]
+        },
+        "contents": contents
+    }
+
     try:
-    r = requests.post(url, json=payload, stream=True, timeout=90)
+        r = requests.post(
+            url,
+            json=payload,
+            stream=True,
+            timeout=90
+        )
 
-    if r.status_code != 200:
-        yield f"\n\nGemini API Error {r.status_code}\n{r.text}"
-        return
+        if r.status_code != 200:
+            yield f"Gemini API Error {r.status_code}\n{r.text}"
+            return
 
-    for line in r.iter_lines():
-        if line:
+        for line in r.iter_lines():
+
+            if not line:
+                continue
+
             s = line.decode("utf-8")
 
-            if s.startswith("data: "):
-                try:
-                    d = json.loads(s[6:])
+            if not s.startswith("data: "):
+                continue
 
-                    for part in d.get("candidates", [{}])[0].get("content", {}).get("parts", []):
-                        t = part.get("text", "")
-                        if t:
-                            yield t
+            try:
+                data = json.loads(s[6:])
 
-                except Exception as e:
-                    yield f"\n\nGemini Parse Error: {str(e)}"
+                candidates = data.get("candidates", [])
 
-except Exception as e:
-    yield f"\n\n⚠️ Gemini error: {e}"
+                if not candidates:
+                    continue
+
+                parts = candidates[0].get("content", {}).get("parts", [])
+
+                for part in parts:
+                    text = part.get("text")
+
+                    if text:
+                        yield text
+
+            except Exception as parse_error:
+                yield f"\nParse Error: {parse_error}"
+
     except Exception as e:
-        yield f"\n\n⚠️ Gemini error: {e}"
+        yield f"\nGemini Error: {e}"
 
 def groq_stream(messages, system):
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
