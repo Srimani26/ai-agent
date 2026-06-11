@@ -67,14 +67,14 @@ You are Sri's (Srimani26) exclusive personal AI. Sri is an AI Engineer & Automat
 Senior engineer + trusted advisor. Honest, precise, encouraging.
 Sri is 3.5 years into his career building real products — support that ambition."""
 
-MODE_EXTRAS = {{
+MODE_EXTRAS = {
     "ai_engineer": "\nMODE: AI Engineering — LLMs, RAG, agents, MCP, embeddings, LangChain, vector DBs. Deep technical answers with working code.",
     "zoho":        "\nMODE: Zoho/ERP — Zoho One, Deluge scripting, CRM customization, roofing ERP, Indian SMB market.",
     "automation":  "\nMODE: Automation — n8n, Make.com, Python bots, API integrations, webhooks.",
     "python":      "\nMODE: Python Expert — FastAPI, async/await, Pydantic, OOP, clean architecture.",
     "web":         "\nMODE: Web Builder — complete HTML/CSS/JS or React code, responsive, professional.",
     "general":     "\nMODE: General — well-rounded assistant, practical advice.",
-}}
+}
 
 # ── SUPABASE ──────────────────────────────────────────────────────────────────
 @st.cache_resource
@@ -83,22 +83,22 @@ def get_sb():
 
 def save_msg(sid, role, content):
     try:
-        get_sb().table("conversations").insert({{
+        get_sb().table("conversations").insert({
             "session_id": sid, "role": role, "content": content,
             "created_at": datetime.utcnow().isoformat()
-        }}).execute()
+        }).execute()
     except: pass
 
 def load_sessions():
     try:
         r = get_sb().table("conversations").select("session_id,content,created_at")\
             .eq("role","user").order("created_at",desc=True).limit(60).execute()
-        seen = {{}}
+        seen = {}
         for row in r.data:
             s = row["session_id"]
             if s not in seen:
                 p = row["content"][:40]+"…" if len(row["content"])>40 else row["content"]
-                seen[s] = {{"id":s,"preview":p}}
+                seen[s] = {"id":s,"preview":p}
         return list(seen.values())[:10]
     except: return []
 
@@ -106,7 +106,7 @@ def load_history(sid):
     try:
         r = get_sb().table("conversations").select("role,content")\
             .eq("session_id",sid).order("created_at").execute()
-        return [{{"role":x["role"],"content":x["content"]}} for x in r.data]
+        return [{"role":x["role"],"content":x["content"]} for x in r.data]
     except: return []
 
 # ── WEB SEARCH ────────────────────────────────────────────────────────────────
@@ -114,10 +114,10 @@ def web_search(q):
     if not SERPER_API_KEY: return ""
     try:
         r = requests.post("https://google.serper.dev/search",
-            headers={{"X-API-KEY":SERPER_API_KEY,"Content-Type":"application/json"}},
-            json={{"q":q,"num":4}}, timeout=8)
+            headers={"X-API-KEY":SERPER_API_KEY,"Content-Type":"application/json"},
+            json={"q":q,"num":4}, timeout=8)
         items = r.json().get("organic",[])[:4]
-        return "\n".join(f"- {{i.get('title','')}}: {{i.get('snippet','')}}" for i in items)
+        return "\n".join(f"- {i.get('title','')}: {i.get('snippet','')}" for i in items)
     except: return ""
 
 def needs_search(msg):
@@ -140,11 +140,11 @@ def auto_route(prompt, mode):
 
 # ── MODEL CALLS ───────────────────────────────────────────────────────────────
 def gemini_stream(messages, system, model="gemini-2.5-pro-preview-06-05"):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{{model}}:streamGenerateContent?key={{GEMINI_API_KEY}}&alt=sse"
-    contents = [{{"role":"user" if m["role"]=="user" else "model","parts":[{{"text":m["content"]}}]}} for m in messages]
-    cfg = {{"temperature":0.7,"maxOutputTokens":8192}}
-    if "pro" in model: cfg["thinkingConfig"] = {{"thinkingBudget":5000}}
-    payload = {{"system_instruction":{{"parts":[{{"text":system}}]}},"contents":contents,"generationConfig":cfg}}
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?key={GEMINI_API_KEY}&alt=sse"
+    contents = [{"role":"user" if m["role"]=="user" else "model","parts":[{"text":m["content"]}]} for m in messages]
+    cfg = {"temperature":0.7,"maxOutputTokens":8192}
+    if "pro" in model: cfg["thinkingConfig"] = {"thinkingBudget":5000}
+    payload = {"system_instruction":{"parts":[{"text":system}]},"contents":contents,"generationConfig":cfg}
     try:
         r = requests.post(url, json=payload, stream=True, timeout=90)
         for line in r.iter_lines():
@@ -153,17 +153,17 @@ def gemini_stream(messages, system, model="gemini-2.5-pro-preview-06-05"):
                 if s.startswith("data: "):
                     try:
                         d = json.loads(s[6:])
-                        for p in d.get("candidates",[{{}}])[0].get("content",{{}}).get("parts",[]):
+                        for p in d.get("candidates",[{}])[0].get("content",{}).get("parts",[]):
                             t = p.get("text","")
                             if t: yield t
                     except: continue
     except Exception as e:
-        yield f"\n\n⚠️ Gemini error: {{e}}"
+        yield f"\n\n⚠️ Gemini error: {e}"
 
 def groq_stream(messages, system):
-    headers = {{"Authorization":f"Bearer {{GROQ_API_KEY}}","Content-Type":"application/json"}}
-    msgs = [{{"role":"system","content":system}}] + [{{"role":m["role"],"content":m["content"]}} for m in messages]
-    payload = {{"model":"llama-3.3-70b-versatile","messages":msgs,"max_tokens":8192,"temperature":0.7,"stream":True}}
+    headers = {"Authorization":f"Bearer {GROQ_API_KEY}","Content-Type":"application/json"}
+    msgs = [{"role":"system","content":system}] + [{"role":m["role"],"content":m["content"]} for m in messages]
+    payload = {"model":"llama-3.3-70b-versatile","messages":msgs,"max_tokens":8192,"temperature":0.7,"stream":True}
     try:
         r = requests.post("https://api.groq.com/openai/v1/chat/completions",
                           headers=headers, json=payload, stream=True, timeout=60)
@@ -172,20 +172,20 @@ def groq_stream(messages, system):
                 s = line.decode("utf-8")
                 if s.startswith("data: ") and s != "data: [DONE]":
                     try:
-                        t = json.loads(s[6:])["choices"][0].get("delta",{{}}).get("content","")
+                        t = json.loads(s[6:])["choices"][0].get("delta",{}).get("content","")
                         if t: yield t
                     except: continue
     except Exception as e:
-        yield f"\n\n⚠️ Groq error: {{e}}"
+        yield f"\n\n⚠️ Groq error: {e}"
 
 def openrouter_stream(messages, system, model="meta-llama/llama-4-scout"):
     if not OPENROUTER_KEY:
         yield from groq_stream(messages, system)
         return
-    headers = {{"Authorization":f"Bearer {{OPENROUTER_KEY}}","Content-Type":"application/json",
-               "HTTP-Referer":"https://aria-sri.streamlit.app","X-Title":"ARIA"}}
-    msgs = [{{"role":"system","content":system}}] + [{{"role":m["role"],"content":m["content"]}} for m in messages]
-    payload = {{"model":model,"messages":msgs,"max_tokens":8192,"temperature":0.7,"stream":True}}
+    headers = {"Authorization":f"Bearer {OPENROUTER_KEY}","Content-Type":"application/json",
+               "HTTP-Referer":"https://aria-sri.streamlit.app","X-Title":"ARIA"}
+    msgs = [{"role":"system","content":system}] + [{"role":m["role"],"content":m["content"]} for m in messages]
+    payload = {"model":model,"messages":msgs,"max_tokens":8192,"temperature":0.7,"stream":True}
     try:
         r = requests.post("https://openrouter.ai/api/v1/chat/completions",
                           headers=headers, json=payload, stream=True, timeout=90)
@@ -194,22 +194,22 @@ def openrouter_stream(messages, system, model="meta-llama/llama-4-scout"):
                 s = line.decode("utf-8")
                 if s.startswith("data: ") and s != "data: [DONE]":
                     try:
-                        t = json.loads(s[6:])["choices"][0].get("delta",{{}}).get("content","")
+                        t = json.loads(s[6:])["choices"][0].get("delta",{}).get("content","")
                         if t: yield t
                     except: continue
     except Exception as e:
-        yield f"\n\n⚠️ OpenRouter error: {{e}}"
+        yield f"\n\n⚠️ OpenRouter error: {e}"
 
 def cohere_stream(messages, system):
     if not COHERE_KEY:
         yield from gemini_stream(messages, system)
         return
-    headers = {{"Authorization":f"Bearer {{COHERE_KEY}}","Content-Type":"application/json","Accept":"application/json"}}
+    headers = {"Authorization":f"Bearer {COHERE_KEY}","Content-Type":"application/json","Accept":"application/json"}
     chat_history = []
     for m in messages[:-1]:
-        chat_history.append({{"role":"USER" if m["role"]=="user" else "CHATBOT","message":m["content"]}})
-    payload = {{"model":"command-r-plus","message":messages[-1]["content"],
-               "chat_history":chat_history,"preamble":system,"stream":True,"max_tokens":4096}}
+        chat_history.append({"role":"USER" if m["role"]=="user" else "CHATBOT","message":m["content"]})
+    payload = {"model":"command-r-plus","message":messages[-1]["content"],
+               "chat_history":chat_history,"preamble":system,"stream":True,"max_tokens":4096}
     try:
         r = requests.post("https://api.cohere.ai/v1/chat",headers=headers,json=payload,stream=True,timeout=60)
         for line in r.iter_lines():
@@ -221,7 +221,7 @@ def cohere_stream(messages, system):
                         if t: yield t
                 except: continue
     except Exception as e:
-        yield f"\n\n⚠️ Cohere error: {{e}}"
+        yield f"\n\n⚠️ Cohere error: {e}"
 
 # ── SMART ROUTER ──────────────────────────────────────────────────────────────
 def respond(messages, system, model, prompt=""):
