@@ -303,7 +303,7 @@ def auto_route(prompt):
     return "gemini-pro"
 
 # ── MODEL CALLS ────────────────────────────────────────────────────────────────
-def gemini_stream(messages, system, model_id="gemini-2.5-pro-preview-06-05", img_b64=None, img_mime=None):
+def gemini_stream(messages, system, model_id="gemini-2.5-pro", img_b64=None, img_mime=None):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:streamGenerateContent?key={GEMINI_API_KEY}&alt=sse"
     contents = []
     for m in messages[:-1]:
@@ -321,6 +321,10 @@ def gemini_stream(messages, system, model_id="gemini-2.5-pro-preview-06-05", img
                "contents": contents, "generationConfig": cfg}
     try:
         r = requests.post(url, json=payload, stream=True, timeout=90)
+        if r.status_code != 200:
+         yield f"\n\nGemini API Error {r.status_code}\n{r.text}"
+        return
+
         for line in r.iter_lines():
             if line:
                 s = line.decode("utf-8")
@@ -330,7 +334,8 @@ def gemini_stream(messages, system, model_id="gemini-2.5-pro-preview-06-05", img
                         for part in d.get("candidates", [{}])[0].get("content", {}).get("parts", []):
                             t = part.get("text", "")
                             if t: yield t
-                    except: continue
+                    except Exception as e:
+    yield f"\n\nGemini Parse Error: {str(e)}"
     except Exception as e:
         yield f"\n\n⚠️ Gemini error: {e}"
 
@@ -426,6 +431,17 @@ if "sessions" not in st.session_state: st.session_state.sessions = None
 # ── SIDEBAR ────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown(
+uploaded = st.file_uploader(
+    "📎 Attach image or PDF (optional)",
+    type=["png", "jpg", "jpeg", "webp", "gif", "pdf"],
+    key="uploader",
+    label_visibility="visible",
+    help="Images → Gemini Vision analyzes them. PDFs → content extracted and analyzed."
+)
+if uploaded and uploaded.type.startswith("image/"):
+    st.image(uploaded, width=280)
+
+
         '<div style="padding:16px 4px 18px;border-bottom:1px solid #1c1c30;margin-bottom:14px">'
         '<div style="display:flex;align-items:center;gap:12px">'
         '<div style="width:38px;height:38px;border-radius:11px;flex-shrink:0;'
@@ -547,15 +563,6 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
 
 # ── FILE UPLOADER ──────────────────────────────────────────────────────────────
-uploaded = st.file_uploader(
-    "📎 Attach image or PDF (optional)",
-    type=["png", "jpg", "jpeg", "webp", "gif", "pdf"],
-    key="uploader",
-    label_visibility="visible",
-    help="Images → Gemini Vision analyzes them. PDFs → content extracted and analyzed."
-)
-if uploaded and uploaded.type.startswith("image/"):
-    st.image(uploaded, width=280)
 
 # ── CHAT INPUT ─────────────────────────────────────────────────────────────────
 if prompt := st.chat_input("Ask ARIA anything…"):
