@@ -537,42 +537,43 @@ def aria_avatar():
 
 # ── WELCOME SCREEN ─────────────────────────────────────────────────────────────
 if not st.session_state.messages:
-    st.markdown(f"""
-    <div style="display:flex;flex-direction:column;align-items:center;
-         justify-content:center;min-height:62vh;text-align:center;padding:40px 16px;
-         animation:fadein 0.4s ease">
+    # Build cards HTML separately to avoid f-string nesting issues
+    _cards_data = [
+        ("🤖", "AI Engineering",  "LLMs · RAG · Agents · MCP"),
+        ("🏗️",  "Zoho ERP",        "Deluge · CRM · Workflows"),
+        ("⚙️",  "Automation",      "n8n · Make · Python bots"),
+        ("🐍",  "Python Expert",   "FastAPI · async · production"),
+    ]
+    _card_html = ""
+    for _icon, _title, _desc in _cards_data:
+        _card_html += (
+            '<div style="background:#0c0c1e;border:1px solid #16162c;border-radius:14px;padding:16px;text-align:left">'
+            '<div style="font-size:20px;margin-bottom:7px">' + _icon + '</div>'
+            '<div style="font-size:13px;font-weight:600;color:#c0c0e0;margin-bottom:2px">' + _title + '</div>'
+            '<div style="font-size:11px;color:#2a2a50">' + _desc + '</div>'
+            '</div>'
+        )
 
-      <div style="width:76px;height:76px;border-radius:22px;margin:0 auto 22px;
-           background:linear-gradient(135deg,#7c6ef7,#ec4899);
-           display:flex;align-items:center;justify-content:center;
-           font-size:32px;font-weight:800;color:#fff;
-           box-shadow:0 0 70px rgba(124,110,247,.45)">A</div>
-
-      <h1 style="font-size:26px;font-weight:700;margin:0 0 10px;
-           background:linear-gradient(135deg,#a89bff,#f472b6);
-           -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-           letter-spacing:-.4px">ARIA is ready, Sri.</h1>
-
-      <p style="color:#2e2e58;font-size:14px;max-width:380px;line-height:1.75;margin:0 0 34px">
-        Personal AI for AI engineering, Zoho ERP,<br>automation, and production Python.
-      </p>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:460px;width:100%">
-        {''.join(f"""
-        <div style="background:#0c0c1e;border:1px solid #16162c;border-radius:14px;
-             padding:16px;text-align:left">
-          <div style="font-size:20px;margin-bottom:7px">{icon}</div>
-          <div style="font-size:13px;font-weight:600;color:#c0c0e0;margin-bottom:2px">{title}</div>
-          <div style="font-size:11px;color:#2a2a50">{desc}</div>
-        </div>""" for icon,title,desc in [
-          ("🤖","AI Engineering","LLMs · RAG · Agents · MCP"),
-          ("🏗️","Zoho ERP","Deluge · CRM · Workflows"),
-          ("⚙️","Automation","n8n · Make · Python bots"),
-          ("🐍","Python Expert","FastAPI · async · production"),
-        ])}
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        '<div style="display:flex;flex-direction:column;align-items:center;'
+        'justify-content:center;min-height:62vh;text-align:center;padding:40px 16px;'
+        'animation:fadein 0.4s ease">'
+        '<div style="width:76px;height:76px;border-radius:22px;margin:0 auto 22px;'
+        'background:linear-gradient(135deg,#7c6ef7,#ec4899);'
+        'display:flex;align-items:center;justify-content:center;'
+        'font-size:32px;font-weight:800;color:#fff;'
+        'box-shadow:0 0 70px rgba(124,110,247,.45)">A</div>'
+        '<h1 style="font-size:26px;font-weight:700;margin:0 0 10px;'
+        'background:linear-gradient(135deg,#a89bff,#f472b6);'
+        '-webkit-background-clip:text;-webkit-text-fill-color:transparent;'
+        'letter-spacing:-.4px">ARIA is ready, Sri.</h1>'
+        '<p style="color:#2e2e58;font-size:14px;max-width:380px;line-height:1.75;margin:0 0 34px">'
+        'Personal AI for AI engineering, Zoho ERP,<br>automation, and production Python.</p>'
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:460px;width:100%">'
+        + _card_html +
+        '</div></div>',
+        unsafe_allow_html=True
+    )
 
 # ── RENDER HISTORY ─────────────────────────────────────────────────────────────
 for msg in st.session_state.messages:
@@ -583,20 +584,79 @@ for msg in st.session_state.messages:
         with c1: aria_avatar()
         with c2: st.markdown(msg["content"])
 
-# ── FILE UPLOAD (above input) ──────────────────────────────────────────────────
-# Small expander so it doesn't dominate the UI
+# ── FILE UPLOAD ────────────────────────────────────────────────────────────────
+# Inject CSS to fully dark-theme the file uploader widget
+st.markdown("""
+<style>
+/* Dark file uploader — override Streamlit's light defaults */
+[data-testid="stFileUploaderDropzone"] {
+    background: #0e0e1e !important;
+    border: 1.5px dashed #22223a !important;
+    border-radius: 12px !important;
+}
+[data-testid="stFileUploaderDropzone"]:hover {
+    border-color: #7c6ef7 !important;
+    background: #11112a !important;
+}
+[data-testid="stFileUploaderDropzone"] p,
+[data-testid="stFileUploaderDropzone"] span,
+[data-testid="stFileUploaderDropzone"] small {
+    color: #33335a !important;
+    font-size: 12px !important;
+}
+[data-testid="stFileUploaderDropzoneInstructions"] {
+    color: #33335a !important;
+}
+[data-testid="stFileUploaderDropzone"] button {
+    background: #16162e !important;
+    border: 1px solid #2a2a4a !important;
+    border-radius: 8px !important;
+    color: #7070b0 !important;
+    font-size: 12px !important;
+    padding: 5px 14px !important;
+}
+[data-testid="stFileUploaderDropzone"] button:hover {
+    border-color: #7c6ef7 !important;
+    color: #a89bff !important;
+}
+/* Hide the default expander chrome and restyle */
+[data-testid="stExpander"] {
+    background: #0a0a18 !important;
+    border: 1px solid #16162c !important;
+    border-radius: 12px !important;
+    margin-bottom: 8px !important;
+}
+[data-testid="stExpander"] summary {
+    color: #44446a !important;
+    font-size: 13px !important;
+    padding: 8px 14px !important;
+}
+[data-testid="stExpander"] summary:hover { color: #7c6ef7 !important; }
+[data-testid="stExpander"] > div > div {
+    background: #0a0a18 !important;
+    padding: 8px 14px 12px !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 with st.expander("📎 Attach file or image", expanded=False):
     uploaded = st.file_uploader(
-        "Upload image or PDF",
-        type=["png","jpg","jpeg","webp","gif","pdf"],
+        "drop",
+        type=["png", "jpg", "jpeg", "webp", "gif", "pdf"],
         key="uploader",
-        label_visibility="collapsed"
+        label_visibility="collapsed",
+        help="Images are sent to Gemini Vision. PDFs are read and analyzed."
     )
     if uploaded:
         if uploaded.type.startswith("image/"):
-            st.image(uploaded, width=300)
+            st.image(uploaded, width=260)
         else:
-            st.markdown(f'<div style="padding:8px 12px;background:#0d0d20;border:1px solid #1a1a30;border-radius:8px;font-size:12px;color:#6060a0">📄 {uploaded.name}</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;'
+                f'background:#0d0d20;border:1px solid #1a1a30;border-radius:8px;'
+                f'font-size:12px;color:#6060a0">📄 {uploaded.name}</div>',
+                unsafe_allow_html=True
+            )
 
 # ── CHAT INPUT ─────────────────────────────────────────────────────────────────
 if prompt := st.chat_input("Ask ARIA anything…"):
