@@ -148,7 +148,13 @@ html, body, .stApp, [data-testid="stAppViewContainer"] {
     padding-top: 1.5rem;
     padding-bottom: 7rem;
 }
-#MainMenu, footer, header { visibility: hidden; }
+#MainMenu, footer { visibility: hidden; }
+header { background: transparent !important; }
+header [data-testid="stToolbar"] { visibility: hidden; }
+[data-testid="collapsedControl"] {
+    visibility: visible !important;
+    color: #a29bfe !important;
+}
 
 /* Chat bubbles */
 [data-testid="stChatMessage"] {
