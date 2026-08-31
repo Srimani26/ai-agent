@@ -369,17 +369,20 @@ if prompt:
         placeholder = st.empty()
         full_response = ""
 
-        try:
-            system_prompt = build_system_prompt()
-            model = get_model(system_prompt)
+       try:
+system_prompt = build_system_prompt()
+model = get_model(system_prompt)
+history = []
+for m in st.session_state.messages[:-1]:
+role = "user" if m["role"] == "user" else "model"
+history.append({"role": role, "parts": [m["content"]]})
 
-            history = []
-            for m in st.session_state.messages[:-1]:
-                role = "user" if m["role"] == "user" else "model"
-                history.append({"role": role, "parts": [m["content"]]})
+drafts = get_proposer_drafts(prompt)
+augmented_prompt = build_aggregator_prompt(prompt, drafts)
+final_parts = [augmented_prompt] + gemini_parts[1:]
 
-            chat = model.start_chat(history=history)
-            response = chat.send_message(gemini_parts, stream=True)
+chat = model.start_chat(history=history)
+response = chat.send_message(final_parts, stream=True)
 
             for chunk in response:
                 if chunk.text:
