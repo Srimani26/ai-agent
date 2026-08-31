@@ -369,7 +369,7 @@ if prompt:
         placeholder = st.empty()
         full_response = ""
 
-             try:
+        try:
             system_prompt = build_system_prompt()
             model = get_model(system_prompt)
             history = []
