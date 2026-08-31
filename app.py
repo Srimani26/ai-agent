@@ -151,7 +151,11 @@ html, body, .stApp, [data-testid="stAppViewContainer"] {
 #MainMenu, footer { visibility: hidden; }
 header { background: transparent !important; }
 header [data-testid="stToolbar"] { visibility: hidden; }
-[data-testid="collapsedControl"] {
+[data-testid="stSidebarCollapseButton"] {
+    visibility: visible !important;
+    color: #a29bfe !important;
+}
+[data-testid="stSidebarCollapsedControl"] {
     visibility: visible !important;
     color: #a29bfe !important;
 }
